@@ -1,0 +1,123 @@
+package views
+
+import (
+	"fmt"
+	"stripe-fortnox-sync/internal/db"
+)
+
+type DashboardData struct {
+	TotalCustomers   int64
+	TotalCharges     int64
+	TotalPayouts     int64
+	TotalVouchers    int64
+	UnsyncedCharges  int64
+	UnsyncedPayouts  int64
+	FortnoxConnected bool
+	SyncStates       []db.SyncState
+	RecentLogs       []db.SyncLog
+}
+
+templ Dashboard(d DashboardData) {
+	@Layout("Översikt") {
+		<h1 class="page-title">Översikt</h1>
+		<div class="stats-grid">
+			<div class="stat-card">
+				<div class="stat-value">{ fmt.Sprintf("%d", d.TotalCustomers) }</div>
+				<div class="stat-label">Kunder</div>
+			</div>
+			<div class="stat-card">
+				<div class="stat-value">{ fmt.Sprintf("%d", d.TotalCharges) }</div>
+				<div class="stat-label">Betalningar</div>
+			</div>
+			<div class="stat-card">
+				<div class="stat-value">{ fmt.Sprintf("%d", d.TotalPayouts) }</div>
+				<div class="stat-label">Utbetalningar</div>
+			</div>
+			<div class="stat-card">
+				<div class="stat-value">{ fmt.Sprintf("%d", d.TotalVouchers) }</div>
+				<div class="stat-label">Verifikationer</div>
+			</div>
+		</div>
+		if d.UnsyncedCharges > 0 || d.UnsyncedPayouts > 0 {
+			<div class="alert alert-warning">
+				<strong>Väntar på synk:</strong>
+				{ fmt.Sprintf("%d betalning(ar), %d utbetalning(ar) ej bokförda", d.UnsyncedCharges, d.UnsyncedPayouts) }
+				<a href="/sync" class="btn btn-sm btn-primary ml-2">Synka nu</a>
+			</div>
+		}
+		if !d.FortnoxConnected {
+			<div class="alert alert-danger">
+				Fortnox är inte anslutet. <a href="/settings">Konfigurera under Inställningar</a>
+			</div>
+		}
+		<section class="section">
+			<h2>Synkstatus</h2>
+			@syncStatesTable(d.SyncStates)
+		</section>
+		<section class="section">
+			<h2>Senaste aktivitet</h2>
+			@recentLogsTable(d.RecentLogs)
+		</section>
+	}
+}
+
+templ syncStatesTable(states []db.SyncState) {
+	<table class="table">
+		<thead>
+			<tr><th>Entitet</th><th>Status</th><th>Senaste synk-ID</th></tr>
+		</thead>
+		<tbody>
+			for _, s := range states {
+				<tr>
+					<td>{ s.EntityType }</td>
+					<td><span class={ "badge badge-" + dashStatusClass(s.Status) }>{ s.Status }</span></td>
+					<td>
+						if s.LastSyncedID.Valid {
+							<code>{ s.LastSyncedID.String }</code>
+						} else {
+							<span class="muted">—</span>
+						}
+					</td>
+				</tr>
+			}
+		</tbody>
+	</table>
+}
+
+func dashStatusClass(s string) string {
+	switch s {
+	case "running":
+		return "warning"
+	case "error":
+		return "danger"
+	default:
+		return "success"
+	}
+}
+
+templ recentLogsTable(logs []db.SyncLog) {
+	if len(logs) == 0 {
+		<p class="text-muted">Ingen aktivitet ännu.</p>
+	} else {
+		<table class="table table-sm">
+			<thead>
+				<tr><th>Tid</th><th>Entitet</th><th>ID</th><th>Åtgärd</th><th>Detaljer</th></tr>
+			</thead>
+			<tbody>
+				for _, l := range logs {
+					<tr>
+						<td>{ l.CreatedAt }</td>
+						<td>{ l.EntityType }</td>
+						<td><code>{ l.EntityID }</code></td>
+						<td>{ l.Action }</td>
+						<td>
+							if l.Details.Valid {
+								{ l.Details.String }
+							}
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	}
+}

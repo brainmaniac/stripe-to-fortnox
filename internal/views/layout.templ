@@ -1,0 +1,27 @@
+package views
+
+import "stripe-fortnox-sync/internal/views/components"
+
+templ Base(title string) {
+	<!DOCTYPE html>
+	<html lang="sv">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ title } – Stripe→Fortnox</title>
+			<link rel="stylesheet" href="/static/css/style.css"/>
+		</head>
+		<body>
+			{ children... }
+		</body>
+	</html>
+}
+
+templ Layout(title string) {
+	@Base(title) {
+		@components.Nav()
+		<main class="container">
+			{ children... }
+		</main>
+	}
+}

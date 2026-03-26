@@ -1,0 +1,29 @@
+package views
+
+templ Login(errorMsg string) {
+	@Base("Logga in") {
+		<div class="login-container">
+			<div class="login-card">
+				<h1>Stripe→Fortnox</h1>
+				<h2>Logga in</h2>
+				if errorMsg != "" {
+					<div class="flash flash-danger">{ errorMsg }</div>
+				}
+				<form method="POST" action="/login">
+					<div class="form-group">
+						<label for="password">Lösenord</label>
+						<input
+							type="password"
+							id="password"
+							name="password"
+							class="form-control"
+							autofocus
+							required
+						/>
+					</div>
+					<button type="submit" class="btn btn-primary btn-block">Logga in</button>
+				</form>
+			</div>
+		</div>
+	}
+}

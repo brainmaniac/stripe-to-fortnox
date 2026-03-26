@@ -1,0 +1,120 @@
+package views
+
+import (
+	"fmt"
+	"stripe-fortnox-sync/internal/db"
+)
+
+type VouchersData struct {
+	Vouchers []db.FortnoxVoucher
+	Total    int64
+	Page     int64
+	PageSize int64
+}
+
+templ Vouchers(d VouchersData) {
+	@Layout("Verifikationer") {
+		<h1 class="page-title">Verifikationer</h1>
+		<p class="text-muted">{ fmt.Sprintf("Totalt: %d verifikationer", d.Total) }</p>
+		if len(d.Vouchers) == 0 {
+			<p>Inga verifikationer skapade ännu. <a href="/sync">Hämta från Stripe och skicka till Fortnox</a> för att skapa dem.</p>
+		} else {
+			<table class="table">
+				<thead>
+					<tr>
+						<th>Fortnox-nr</th>
+						<th>Serie</th>
+						<th>Datum</th>
+						<th>Beskrivning</th>
+						<th>Källa</th>
+						<th>Debet (kr)</th>
+						<th>Kredit (kr)</th>
+						<th>Skapad</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, v := range d.Vouchers {
+						<tr>
+							<td>
+								if v.FortnoxVoucherNumber.Valid {
+									<code>{ v.FortnoxVoucherNumber.String }</code>
+								} else {
+									<span class="text-muted">—</span>
+								}
+							</td>
+							<td>{ v.FortnoxVoucherSeries }</td>
+							<td>{ v.VoucherDate }</td>
+							<td>
+								if v.Description.Valid {
+									{ v.Description.String }
+								}
+							</td>
+							<td>
+								<span class={ "badge badge-" + voucherSourceClass(v.SourceType) }>
+									{ voucherSourceLabel(v.SourceType) }
+								</span>
+								<code>{ v.SourceID }</code>
+							</td>
+							<td>{ fmt.Sprintf("%.2f", float64(v.TotalDebit)/100) }</td>
+							<td>{ fmt.Sprintf("%.2f", float64(v.TotalCredit)/100) }</td>
+							<td>{ v.CreatedAt }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			@voucherPagination(d)
+		}
+	}
+}
+
+func voucherSourceClass(sourceType string) string {
+	switch sourceType {
+	case "charge":
+		return "success"
+	case "payout":
+		return "primary"
+	case "fee":
+		return "warning"
+	default:
+		return "secondary"
+	}
+}
+
+func voucherSourceLabel(sourceType string) string {
+	switch sourceType {
+	case "charge":
+		return "betalning"
+	case "payout":
+		return "utbetalning"
+	case "fee":
+		return "avgift"
+	default:
+		return sourceType
+	}
+}
+
+templ voucherPagination(d VouchersData) {
+	<div class="pagination">
+		if d.Page > 1 {
+			<a href={ templ.SafeURL(fmt.Sprintf("/vouchers?page=%d", d.Page-1)) } class="btn btn-sm">← Föregående</a>
+		}
+		<span class="pagination-info">
+			{ fmt.Sprintf("Sida %d – visar %d–%d av %d",
+				d.Page,
+				(d.Page-1)*d.PageSize+1,
+				min64(d.Page*d.PageSize, d.Total),
+				d.Total,
+			) }
+		</span>
+		if d.Page*d.PageSize < d.Total {
+			<a href={ templ.SafeURL(fmt.Sprintf("/vouchers?page=%d", d.Page+1)) } class="btn btn-sm">Nästa →</a>
+		}
+	</div>
+}
+
+func min64(a, b int64) int64 {
+	if a < b {
+		return a
+	}
+	return b
+}

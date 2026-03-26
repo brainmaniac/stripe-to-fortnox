@@ -1,0 +1,21 @@
+package components
+
+templ Nav() {
+	<nav class="navbar">
+		<div class="navbar-brand">
+			<a href="/">Stripe→Fortnox</a>
+		</div>
+		<ul class="navbar-menu">
+			<li><a href="/">Översikt</a></li>
+			<li><a href="/sync">Synkronisering</a></li>
+			<li><a href="/vouchers">Verifikationer</a></li>
+			<li><a href="/logs">Loggar</a></li>
+			<li><a href="/settings">Inställningar</a></li>
+			<li>
+				<form method="POST" action="/logout" style="display:inline">
+					<button type="submit" class="btn-link">Logga ut</button>
+				</form>
+			</li>
+		</ul>
+	</nav>
+}

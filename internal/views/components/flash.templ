@@ -1,0 +1,9 @@
+package components
+
+templ Flash(kind, message string) {
+	if message != "" {
+		<div class={ "flash flash-" + kind }>
+			{ message }
+		</div>
+	}
+}

@@ -1,0 +1,51 @@
+package views
+
+import (
+	"fmt"
+	"stripe-fortnox-sync/internal/db"
+	"stripe-fortnox-sync/internal/views/components"
+)
+
+type SyncPageData struct {
+	SyncStates      []db.SyncState
+	UnsyncedCharges int64
+	UnsyncedPayouts int64
+	Flash           string
+}
+
+templ SyncPage(d SyncPageData) {
+	@Layout("Synkronisering") {
+		<h1 class="page-title">Synkronisering</h1>
+		if d.Flash == "sync_started" {
+			<div class="flash flash-success">Hämtning från Stripe startad i bakgrunden.</div>
+		}
+		if d.Flash == "fortnox_sync_started" {
+			<div class="flash flash-success">Verifikationsskapande i Fortnox startad i bakgrunden.</div>
+		}
+		<section class="section">
+			<h2>Hämta från Stripe</h2>
+			<p>Hämtar de senaste betalningarna, utbetalningarna, kunderna och saldotransaktionerna från Stripe till den lokala databasen.</p>
+			<form method="POST" action="/sync/stripe">
+				<button type="submit" class="btn btn-primary">Hämta från Stripe</button>
+			</form>
+		</section>
+		<section class="section">
+			<h2>Skicka till Fortnox</h2>
+			<p>Skapar verifikationer i Fortnox för alla ej bokförda betalningar och utbetalningar.</p>
+			if d.UnsyncedCharges > 0 || d.UnsyncedPayouts > 0 {
+				<p class="text-warning">
+					{ fmt.Sprintf("%d betalning(ar) och %d utbetalning(ar) väntar på bokföring.", d.UnsyncedCharges, d.UnsyncedPayouts) }
+				</p>
+			} else {
+				<p class="text-muted">Alla betalningar och utbetalningar är bokförda i Fortnox.</p>
+			}
+			<form method="POST" action="/sync/fortnox">
+				<button type="submit" class="btn btn-primary">Skicka till Fortnox</button>
+			</form>
+		</section>
+		<section class="section">
+			<h2>Synkstatus</h2>
+			@components.SyncStatusTable(d.SyncStates)
+		</section>
+	}
+}

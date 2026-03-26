@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go mod:*)",
+      "Bash(go build:*)",
+      "Bash(templ version:*)",
+      "Bash(templ generate:*)",
+      "Bash(go get:*)",
+      "Bash(openssl rand:*)",
+      "WebFetch(domain:docs.stripe.com)",
+      "WebFetch(domain:apps.fortnox.se)",
+      "WebSearch",
+      "WebFetch(domain:developer.fortnox.se)",
+      "WebFetch(domain:www.fortnox.se)",
+      "Bash(go test:*)"
+    ]
+  }
+}

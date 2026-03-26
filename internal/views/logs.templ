@@ -1,0 +1,54 @@
+package views
+
+import "stripe-fortnox-sync/internal/db"
+
+templ Logs(logs []db.SyncLog) {
+	@Layout("Loggar") {
+		<h1 class="page-title">Synklogg</h1>
+		if len(logs) == 0 {
+			<p class="text-muted">Inga loggposter ännu.</p>
+		} else {
+			<table class="table table-sm">
+				<thead>
+					<tr>
+						<th>Tid</th>
+						<th>Entitet</th>
+						<th>ID</th>
+						<th>Åtgärd</th>
+						<th>Detaljer</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, l := range logs {
+						<tr>
+							<td>{ l.CreatedAt }</td>
+							<td>{ l.EntityType }</td>
+							<td><code>{ l.EntityID }</code></td>
+							<td><span class={ "badge badge-" + logActionClass(l.Action) }>{ l.Action }</span></td>
+							<td>
+								if l.Details.Valid && l.Details.String != "" {
+									<small class="text-muted">{ l.Details.String }</small>
+								}
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		}
+	}
+}
+
+func logActionClass(action string) string {
+	switch action {
+	case "synced_from_stripe":
+		return "success"
+	case "fortnox_synced":
+		return "primary"
+	case "fortnox_error", "error":
+		return "danger"
+	case "skipped":
+		return "secondary"
+	default:
+		return "secondary"
+	}
+}

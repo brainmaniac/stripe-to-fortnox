@@ -1,0 +1,137 @@
+package views
+
+type SettingsData struct {
+	FortnoxConnected bool
+	FortnoxClientID  string
+	StripeKeySet     bool
+	FlashKind        string
+	FlashMsg         string
+	AccountConfig    AccountConfigForm
+}
+
+type AccountConfigForm struct {
+	StripeClearing   string
+	BankAccount      string
+	RevenueSE        string
+	RevenueEU        string
+	RevenueWO        string
+	OutputVAT25      string
+	PaymentFee       string
+	ReverseVATDebit  string
+	ReverseVATCredit string
+	VoucherSeries    string
+	VATPercent       string
+}
+
+templ Settings(d SettingsData) {
+	@Layout("Inställningar") {
+		<h1 class="page-title">Inställningar</h1>
+		if d.FlashMsg != "" {
+			<div class={ "flash flash-" + d.FlashKind }>{ d.FlashMsg }</div>
+		}
+		<section class="section">
+			<h2>Fortnox-anslutning</h2>
+			if d.FortnoxConnected {
+				<div class="alert alert-success">Fortnox är anslutet.</div>
+				<form method="POST" action="/settings/fortnox/disconnect">
+					<button type="submit" class="btn btn-danger">Koppla från Fortnox</button>
+				</form>
+			} else {
+				<div class="alert alert-warning">Fortnox är inte anslutet.</div>
+				if d.FortnoxClientID != "" {
+					<a href="/auth/fortnox" class="btn btn-primary">Anslut Fortnox</a>
+				} else {
+					<p class="text-muted">Ange FORTNOX_CLIENT_ID och FORTNOX_CLIENT_SECRET i miljövariabler först.</p>
+				}
+			}
+		</section>
+		<section class="section">
+			<h2>Kontoinställningar</h2>
+			<p class="text-muted" style="margin-bottom:1rem">Dessa konton används vid skapande av verifikationer i Fortnox.</p>
+			<form method="POST" action="/settings/accounts">
+				<table class="table" style="max-width:700px">
+					<thead>
+						<tr>
+							<th>Beskrivning</th>
+							<th>Konto</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>
+								<strong>Avstämningskonto Stripe</strong><br/>
+								<small class="text-muted">Debiteras vid betalning, krediteras vid utbetalning/avgift</small>
+							</td>
+							<td><input type="text" name="stripe_clearing" class="form-control" value={ d.AccountConfig.StripeClearing } placeholder="1521" style="max-width:100px"/></td>
+						</tr>
+						<tr>
+							<td>
+								<strong>Utbetalningskonto bank</strong><br/>
+								<small class="text-muted">Debiteras när Stripe betalar ut till bankkonto</small>
+							</td>
+							<td><input type="text" name="bank_account" class="form-control" value={ d.AccountConfig.BankAccount } placeholder="1930" style="max-width:100px"/></td>
+						</tr>
+						<tr>
+							<td>
+								<strong>Intäktskonto Sverige (SE)</strong><br/>
+								<small class="text-muted">Krediteras vid betalning från svensk kund</small>
+							</td>
+							<td><input type="text" name="revenue_se" class="form-control" value={ d.AccountConfig.RevenueSE } placeholder="3010" style="max-width:100px"/></td>
+						</tr>
+						<tr>
+							<td>
+								<strong>Intäktskonto EU</strong><br/>
+								<small class="text-muted">Krediteras vid betalning från EU-kund (ej Sverige)</small>
+							</td>
+							<td><input type="text" name="revenue_eu" class="form-control" value={ d.AccountConfig.RevenueEU } placeholder="3007" style="max-width:100px"/></td>
+						</tr>
+						<tr>
+							<td>
+								<strong>Intäktskonto utanför EU (WO)</strong><br/>
+								<small class="text-muted">Krediteras vid betalning från kund utanför EU</small>
+							</td>
+							<td><input type="text" name="revenue_wo" class="form-control" value={ d.AccountConfig.RevenueWO } placeholder="3008" style="max-width:100px"/></td>
+						</tr>
+						<tr>
+							<td>
+								<strong>Utgående moms 25%</strong><br/>
+								<small class="text-muted">Krediteras med momsdelen vid svenska försäljningar</small>
+							</td>
+							<td><input type="text" name="output_vat25" class="form-control" value={ d.AccountConfig.OutputVAT25 } placeholder="2611" style="max-width:100px"/></td>
+						</tr>
+						<tr>
+							<td>
+								<strong>Konto betalväxelavgift</strong><br/>
+								<small class="text-muted">Debiteras med Stripe-avgiftens nettobelopp</small>
+							</td>
+							<td><input type="text" name="payment_fee" class="form-control" value={ d.AccountConfig.PaymentFee } placeholder="6065" style="max-width:100px"/></td>
+						</tr>
+						<tr>
+							<td>
+								<strong>Omvänd moms betalväxelavgift – debet</strong><br/>
+								<small class="text-muted">Ingående moms vid omvänd skattskyldighet (Stripe/Irland)</small>
+							</td>
+							<td><input type="text" name="reverse_vat_debit" class="form-control" value={ d.AccountConfig.ReverseVATDebit } placeholder="2645" style="max-width:100px"/></td>
+						</tr>
+						<tr>
+							<td>
+								<strong>Omvänd moms betalväxelavgift – kredit</strong><br/>
+								<small class="text-muted">Utgående moms vid omvänd skattskyldighet (Stripe/Irland)</small>
+							</td>
+							<td><input type="text" name="reverse_vat_credit" class="form-control" value={ d.AccountConfig.ReverseVATCredit } placeholder="2614" style="max-width:100px"/></td>
+						</tr>
+					</tbody>
+				</table>
+				<div class="form-group" style="margin-top:1rem">
+					<label>Verifikationsserie (standard: A)</label>
+					<input type="text" name="voucher_series" class="form-control" value={ d.AccountConfig.VoucherSeries } placeholder="A"/>
+				</div>
+				<div class="form-group">
+					<label>Momssats % (standard: 25)</label>
+					<input type="text" name="vat_percent" class="form-control" value={ d.AccountConfig.VATPercent } placeholder="25"/>
+				</div>
+				<button type="submit" class="btn btn-primary">Spara kontoinställningar</button>
+			</form>
+		</section>
+	}
+}

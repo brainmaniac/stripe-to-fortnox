@@ -1,0 +1,65 @@
+package components
+
+import (
+	"database/sql"
+	"fmt"
+	"time"
+
+	"stripe-fortnox-sync/internal/db"
+)
+
+func syncStatusClass(status string) string {
+	switch status {
+	case "running":
+		return "warning"
+	case "error":
+		return "danger"
+	default:
+		return "success"
+	}
+}
+
+func formatNullUnix(v sql.NullInt64) string {
+	if !v.Valid || v.Int64 == 0 {
+		return "—"
+	}
+	return time.Unix(v.Int64, 0).Format("2006-01-02 15:04")
+}
+
+func nullStrVal(v sql.NullString) string {
+	if !v.Valid {
+		return fmt.Sprintf("")
+	}
+	return v.String
+}
+
+templ SyncStatusTable(states []db.SyncState) {
+	<table class="table">
+		<thead>
+			<tr>
+				<th>Entitet</th>
+				<th>Status</th>
+				<th>Senaste ID</th>
+				<th>Senaste synk</th>
+			</tr>
+		</thead>
+		<tbody>
+			for _, s := range states {
+				<tr>
+					<td>{ s.EntityType }</td>
+					<td>
+						<span class={ "badge badge-" + syncStatusClass(s.Status) }>{ s.Status }</span>
+					</td>
+					<td>
+						if s.LastSyncedID.Valid {
+							<code>{ s.LastSyncedID.String }</code>
+						} else {
+							<span class="text-muted">—</span>
+						}
+					</td>
+					<td>{ formatNullUnix(s.LastSyncedAt) }</td>
+				</tr>
+			}
+		</tbody>
+	</table>
+}
