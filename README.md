@@ -33,7 +33,7 @@ This section describes what the app actually does, end to end. Each bullet is co
 
 - **Stripe data is idempotent (UPSERT)**: All Stripe data — charges, payouts, customers, balance transactions — is written with `INSERT … ON CONFLICT DO UPDATE`. Re-running a sync or receiving a duplicate webhook event never creates duplicate records.
 
-- **Fortnox vouchers are idempotent (two-phase write)**: Before calling Fortnox, the app inserts a pending row locally using `INSERT OR IGNORE`. After a successful Fortnox response, the row is updated with the Fortnox voucher number. If the process crashes between the API call and the database update, the next run finds the pending row and retries only the Fortnox call — it does not create a second pending row.
+- **Fortnox vouchers are idempotent (two-phase write)**: Before calling Fortnox, the app inserts a pending row locally using `INSERT OR IGNORE`. After a successful Fortnox response, the row is updated with the Fortnox voucher number. If the process crashes between the API call and the database update, the pending row remains — it is surfaced on the Sync page as a warning. The charge or payout is **not** retried automatically; it is excluded from the unsynced list so you can check Fortnox manually and decide whether to void a duplicate.
 
 - **Account 1521 as the Stripe clearing account**: Account 1521 bridges charges and payouts. Every sale credits 1521 (money owed by Stripe), and every payout debits 1521 (money received from Stripe). Its running balance matches the Stripe dashboard balance at all times.
 

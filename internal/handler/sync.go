@@ -97,12 +97,14 @@ func (h *SyncHandler) SyncPage(w http.ResponseWriter, r *http.Request) {
 
 	unsyncedCharges, _ := h.queries.CountUnsyncedCharges(ctx)
 	unsyncedPayouts, _ := h.queries.CountUnsyncedPayouts(ctx)
+	pendingVouchers, _ := h.queries.ListPendingFortnoxVouchers(ctx)
 
 	flash := r.URL.Query().Get("flash")
 	data := views.SyncPageData{
 		SyncStates:      states,
 		UnsyncedCharges: unsyncedCharges,
 		UnsyncedPayouts: unsyncedPayouts,
+		PendingVouchers: pendingVouchers,
 		Flash:           flash,
 	}
 	if err := views.SyncPage(data).Render(ctx, w); err != nil {

@@ -10,6 +10,7 @@ type SyncPageData struct {
 	SyncStates      []db.SyncState
 	UnsyncedCharges int64
 	UnsyncedPayouts int64
+	PendingVouchers []db.FortnoxVoucher
 	Flash           string
 }
 
@@ -43,6 +44,36 @@ templ SyncPage(d SyncPageData) {
 				<button type="submit" class="btn btn-primary">Skicka till Fortnox</button>
 			</form>
 		</section>
+		if len(d.PendingVouchers) > 0 {
+			<section class="section">
+				<h2>⚠ Ej bekräftade verifikationer</h2>
+				<p class="text-warning">
+					{ fmt.Sprintf("%d verifikation(er) skapades lokalt men fick inget svar från Fortnox. Kontrollera om de finns i Fortnox och radera dem manuellt om de är dubbletter. Dessa skickas inte automatiskt igen.", len(d.PendingVouchers)) }
+				</p>
+				<table class="table">
+					<thead>
+						<tr>
+							<th>Typ</th>
+							<th>Källa</th>
+							<th>Datum</th>
+							<th>Beskrivning</th>
+							<th>Skapad</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, v := range d.PendingVouchers {
+							<tr>
+								<td>{ v.SourceType }</td>
+								<td>{ v.SourceID }</td>
+								<td>{ v.VoucherDate }</td>
+								<td>{ v.Description.String }</td>
+								<td>{ v.CreatedAt }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</section>
+		}
 		<section class="section">
 			<h2>Synkstatus</h2>
 			@components.SyncStatusTable(d.SyncStates)

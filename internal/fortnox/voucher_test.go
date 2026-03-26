@@ -303,16 +303,18 @@ func TestChargeVoucherIdempotentConfirmed(t *testing.T) {
 	}
 }
 
-// ── Bullet 11: pending row is retried, not duplicated ────────────────────────
+// ── Bullet 11: failed Fortnox call leaves a pending row, surfaced for manual review ──
+// The handler will NOT retry the charge automatically (ListUnsyncedCharges excludes
+// it). Only direct calls to CreateChargeVoucher (e.g. a future manual retry button)
+// will attempt again. INSERT OR IGNORE ensures there is still only one local row.
 
-func TestChargeVoucherPendingRowRetried(t *testing.T) {
-	// First attempt: Fortnox API fails.
+func TestChargeVoucherFailedFortnoxLeavesPendingRow(t *testing.T) {
 	failPoster := &mockPoster{err: fmt.Errorf("fortnox unavailable")}
 	vc, q := newCreator(t, failPoster)
 	ctx := context.Background()
 
 	charge := db.StripeCharge{
-		ID:        "ch_retry",
+		ID:        "ch_fail",
 		Amount:    10000,
 		Currency:  "sek",
 		Status:    "succeeded",
@@ -321,10 +323,10 @@ func TestChargeVoucherPendingRowRetried(t *testing.T) {
 
 	_, err := vc.CreateChargeVoucher(ctx, charge, "SE")
 	if err == nil {
-		t.Fatal("expected error on first attempt")
+		t.Fatal("expected error when Fortnox is unavailable")
 	}
 
-	// A pending row should exist (no voucher number yet).
+	// A pending row must exist (no voucher number).
 	pending, err := q.GetFortnoxVoucherBySource(ctx, "charge", charge.ID)
 	if err != nil {
 		t.Fatalf("get pending: %v", err)
@@ -333,32 +335,28 @@ func TestChargeVoucherPendingRowRetried(t *testing.T) {
 		t.Fatal("expected pending row after failed Fortnox POST")
 	}
 	if pending.FortnoxVoucherNumber.Valid {
-		t.Error("pending row should not have a voucher number")
+		t.Error("pending row should not have a voucher number yet")
 	}
 
-	// Second attempt: Fortnox API succeeds.
-	vc.api = &mockPoster{voucherNumber: "retry1"}
+	// Calling again (e.g. manual retry) does not create a second local row.
+	vc.api = &mockPoster{voucherNumber: "manual_retry1"}
 	v, err := vc.CreateChargeVoucher(ctx, charge, "SE")
 	if err != nil {
-		t.Fatalf("retry: %v", err)
+		t.Fatalf("manual retry: %v", err)
 	}
 	if !v.FortnoxVoucherNumber.Valid {
-		t.Error("retry should produce a confirmed voucher")
+		t.Error("manual retry should produce a confirmed voucher")
 	}
 
-	// Only one row in DB (INSERT OR IGNORE prevented a second pending row).
-	all, err := q.ListFortnoxVouchers(ctx, 100, 0)
-	if err != nil {
-		t.Fatalf("list: %v", err)
-	}
-	var count int
+	all, _ := q.ListFortnoxVouchers(ctx, 100, 0)
+	count := 0
 	for _, vv := range all {
 		if vv.SourceType == "charge" && vv.SourceID == charge.ID {
 			count++
 		}
 	}
 	if count != 1 {
-		t.Errorf("expected 1 voucher row, found %d", count)
+		t.Errorf("expected exactly 1 voucher row, found %d", count)
 	}
 }
 

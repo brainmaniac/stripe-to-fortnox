@@ -30,7 +30,7 @@ The `## Walkthrough` section of `README.md` is the canonical description of what
 | Fee voucher with reverse VAT | `internal/fortnox/voucher_test.go`: `TestFeeVoucherReverseVAT` |
 | All vouchers are balanced | `internal/fortnox/voucher_test.go`: `TestVoucherBalancedCharge`, `TestPayoutVoucherBalance`, `TestPostVoucherRejectsImbalanced` |
 | Stripe data is idempotent (UPSERT) | `internal/db/queries_test.go`: `TestUpsertStripeChargeIdempotent`, `TestUpsertStripePayoutIdempotent`, `TestUpsertStripeCustomerIdempotent`, `TestUpsertStripeBalanceTransactionIdempotent`, `TestUpsertChargePreservesBillingCountry` |
-| Fortnox vouchers are idempotent (two-phase write) | `internal/fortnox/voucher_test.go`: `TestChargeVoucherIdempotentConfirmed`, `TestChargeVoucherPendingRowRetried`; `internal/db/queries_test.go`: `TestInsertPendingVoucherIdempotent`, `TestListUnsyncedChargesPendingAndConfirmed`, `TestListUnsyncedPayoutsPendingAndConfirmed` |
+| Fortnox vouchers are idempotent (two-phase write) | `internal/fortnox/voucher_test.go`: `TestChargeVoucherIdempotentConfirmed`, `TestChargeVoucherFailedFortnoxLeavesPendingRow`; `internal/db/queries_test.go`: `TestInsertPendingVoucherIdempotent`, `TestListUnsyncedChargesPendingAndConfirmed`, `TestListUnsyncedPayoutsPendingAndConfirmed` |
 | Account 1521 as clearing account | `internal/fortnox/voucher_test.go`: `TestStripeClearingAccountIsShared`, `TestPayoutVoucherAccounts` |
 
 ## Technology notes
@@ -51,4 +51,4 @@ The `## Walkthrough` section of `README.md` is the canonical description of what
 
 ## Known limitations
 
-- **Fortnox has no idempotency keys**: If the process crashes after a successful Fortnox POST but before the local `ConfirmFortnoxVoucher` UPDATE, the next run will retry the Fortnox call and may create a duplicate voucher. This is a known Fortnox API limitation (no idempotency key support as of 2026).
+- **Fortnox has no idempotency keys**: If the process crashes after a successful Fortnox POST but before the local `ConfirmFortnoxVoucher` UPDATE, a duplicate voucher may exist in Fortnox. The app handles this by surfacing the pending row on the Sync page and NOT retrying automatically. The user must check Fortnox manually and void any duplicate. This is a Fortnox API limitation (no idempotency key support as of 2026).

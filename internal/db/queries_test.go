@@ -205,16 +205,19 @@ func TestListUnsyncedChargesPendingAndConfirmed(t *testing.T) {
 		TotalCredit:          10000,
 	})
 
-	// ch_a still counts as unsynced (pending row ≠ confirmed).
+	// ch_a should no longer appear — a pending row blocks automatic retry.
 	charges, _ = q.ListUnsyncedCharges(ctx)
-	if len(charges) != 2 {
-		t.Errorf("pending should not remove from unsynced list; got %d", len(charges))
+	if len(charges) != 1 {
+		t.Errorf("pending row should remove charge from unsynced list; got %d", len(charges))
+	}
+	if charges[0].ID != "ch_b" {
+		t.Errorf("expected ch_b, got %s", charges[0].ID)
 	}
 
 	// Confirm ch_a.
 	_ = q.ConfirmFortnoxVoucher(ctx, "V1", "{}", "charge", "ch_a")
 
-	// Now ch_a should be gone from unsynced.
+	// ch_a is still gone after confirm — confirmed also blocks unsynced list.
 	charges, _ = q.ListUnsyncedCharges(ctx)
 	if len(charges) != 1 {
 		t.Errorf("after confirm expected 1 unsynced, got %d", len(charges))
@@ -254,10 +257,10 @@ func TestListUnsyncedPayoutsPendingAndConfirmed(t *testing.T) {
 		TotalCredit:          50000,
 	})
 
-	// Still 2 unsynced (pending doesn't count as synced).
+	// Pending row removes po_x from the unsynced list — it won't be auto-retried.
 	payouts, _ = q.ListUnsyncedPayouts(ctx)
-	if len(payouts) != 2 {
-		t.Errorf("pending payout should still be unsynced; got %d", len(payouts))
+	if len(payouts) != 1 {
+		t.Errorf("pending payout should be removed from unsynced list; got %d", len(payouts))
 	}
 
 	// Confirm po_x.

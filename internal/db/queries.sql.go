@@ -93,7 +93,6 @@ SELECT sc.id, sc.payment_intent_id, sc.amount, sc.amount_captured, sc.currency, 
     sc.balance_transaction_id, sc.customer_id, sc.description, sc.metadata, sc.created_at, sc.billing_country
 FROM stripe_charges sc
 LEFT JOIN fortnox_vouchers fv ON fv.source_type = 'charge' AND fv.source_id = sc.id
-    AND fv.fortnox_voucher_number IS NOT NULL
 WHERE sc.status = 'succeeded' AND fv.id IS NULL
 ORDER BY sc.created_at ASC`
 	rows, err := q.db.QueryContext(ctx, query)
@@ -119,7 +118,6 @@ func (q *Queries) CountUnsyncedCharges(ctx context.Context) (int64, error) {
 SELECT COUNT(*)
 FROM stripe_charges sc
 LEFT JOIN fortnox_vouchers fv ON fv.source_type = 'charge' AND fv.source_id = sc.id
-    AND fv.fortnox_voucher_number IS NOT NULL
 WHERE sc.status = 'succeeded' AND fv.id IS NULL`
 	var count int64
 	err := q.db.QueryRowContext(ctx, query).Scan(&count)
@@ -152,7 +150,6 @@ SELECT sp.id, sp.amount, sp.currency, sp.arrival_date, sp.status, sp.description
     sp.created_at, sp.synced_at, sp.fortnox_voucher_id
 FROM stripe_payouts sp
 LEFT JOIN fortnox_vouchers fv ON fv.source_type = 'payout' AND fv.source_id = sp.id
-    AND fv.fortnox_voucher_number IS NOT NULL
 WHERE sp.status = 'paid' AND fv.id IS NULL
 ORDER BY sp.created_at ASC`
 	rows, err := q.db.QueryContext(ctx, query)
@@ -177,7 +174,6 @@ func (q *Queries) CountUnsyncedPayouts(ctx context.Context) (int64, error) {
 SELECT COUNT(*)
 FROM stripe_payouts sp
 LEFT JOIN fortnox_vouchers fv ON fv.source_type = 'payout' AND fv.source_id = sp.id
-    AND fv.fortnox_voucher_number IS NOT NULL
 WHERE sp.status = 'paid' AND fv.id IS NULL`
 	var count int64
 	err := q.db.QueryRowContext(ctx, query).Scan(&count)
@@ -412,6 +408,39 @@ FROM fortnox_vouchers ORDER BY created_at DESC LIMIT ? OFFSET ?`
 func (q *Queries) CountFortnoxVouchers(ctx context.Context) (int64, error) {
 	var count int64
 	err := q.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM fortnox_vouchers`).Scan(&count)
+	return count, err
+}
+
+// ListPendingFortnoxVouchers returns vouchers that were reserved locally but
+// never confirmed — i.e. the Fortnox API call never completed successfully.
+// These are surfaced in the UI for manual review; they are NOT retried automatically.
+func (q *Queries) ListPendingFortnoxVouchers(ctx context.Context) ([]FortnoxVoucher, error) {
+	const query = `
+SELECT id, fortnox_voucher_number, fortnox_voucher_series, voucher_date, description,
+    source_type, source_id, total_debit, total_credit, response_data, created_at
+FROM fortnox_vouchers WHERE fortnox_voucher_number IS NULL ORDER BY created_at DESC`
+	rows, err := q.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var vouchers []FortnoxVoucher
+	for rows.Next() {
+		v := FortnoxVoucher{}
+		if err := rows.Scan(&v.ID, &v.FortnoxVoucherNumber, &v.FortnoxVoucherSeries,
+			&v.VoucherDate, &v.Description, &v.SourceType, &v.SourceID,
+			&v.TotalDebit, &v.TotalCredit, &v.ResponseData, &v.CreatedAt); err != nil {
+			return nil, err
+		}
+		vouchers = append(vouchers, v)
+	}
+	return vouchers, rows.Err()
+}
+
+func (q *Queries) CountPendingFortnoxVouchers(ctx context.Context) (int64, error) {
+	var count int64
+	err := q.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM fortnox_vouchers WHERE fortnox_voucher_number IS NULL`).Scan(&count)
 	return count, err
 }
 
