@@ -36,10 +36,10 @@ jobs:
 
             if [ -d "$DEPLOY_PATH/.git" ]; then
               echo "Pulling latest changes..."
-              GIT_TERMINAL_PROMPT=0 git -C "$DEPLOY_PATH" pull origin main
+              git -C "$DEPLOY_PATH" -c credential.helper='' pull origin main
             else
               echo "Cloning repository..."
-              GIT_TERMINAL_PROMPT=0 git clone ${{ secrets.VPS_REPO_URL }} "$DEPLOY_PATH"
+              git -c credential.helper='' clone ${{ secrets.VPS_REPO_URL }} "$DEPLOY_PATH"
             fi
 
             cd "$DEPLOY_PATH"
