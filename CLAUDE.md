@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Interaction protocol
+
+- **`DO:` prefix** — the user wants you to write code and make changes to the codebase. Only make changes when this prefix is present.
+- **No `DO:` prefix** — the user is asking for information, explanation, or discussion. Answer only; do not touch files.
+- **Ambiguous prompt** — if a prompt looks like a command but lacks `DO:`, ask: *"Did you mean this as a DO: command?"* and wait for confirmation before acting.
+
 ## Commands
 
 ```bash

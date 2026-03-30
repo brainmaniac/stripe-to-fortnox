@@ -81,9 +81,10 @@ The included GitHub Actions workflow (`.github/workflows/deploy.yml`) SSHes to y
 
 ### Server prerequisites
 
-On your Debian VPS, install Docker and Docker Compose:
+On your Debian VPS, install Git, Docker and Docker Compose:
 
 ```sh
+sudo apt-get update && sudo apt-get install -y git
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker $USER   # allow your deploy user to run docker
 ```
@@ -110,7 +111,7 @@ Add these secrets under **Settings → Secrets → Actions** in your GitHub repo
 | `VPS_USER` | `deploy` |
 | `VPS_SSH_KEY` | `-----BEGIN OPENSSH PRIVATE KEY-----\nAAA...` |
 | `VPS_DEPLOY_PATH` | `/opt/stripe-fortnox-sync` |
-| `VPS_REPO_URL` | `git@github.com:youruser/stripe-till-fortnox.git` |
+| `VPS_REPO_URL` | `git@github.com:youruser/stripe-to-fortnox.git` |
 
 For `VPS_SSH_KEY`, generate a dedicated key pair and add the public key to `~/.ssh/authorized_keys` on the VPS:
 
