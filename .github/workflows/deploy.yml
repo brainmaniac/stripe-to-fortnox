@@ -43,4 +43,10 @@ jobs:
             fi
 
             cd "$DEPLOY_PATH"
+
+            if [ ! -f ".env" ]; then
+              echo "No .env file found. SSH into the server and run: go run ./cmd/setup"
+              exit 0
+            fi
+
             docker compose up -d --build

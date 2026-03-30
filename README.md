@@ -87,6 +87,7 @@ On your Debian VPS, install Git, Docker and Docker Compose:
 sudo apt-get update && sudo apt-get install -y git
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker $USER   # allow your deploy user to run docker
+newgrp docker                   # apply group change without logging out
 ```
 
 ### One-time server setup
