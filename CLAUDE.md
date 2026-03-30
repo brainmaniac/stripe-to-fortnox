@@ -1,3 +1,64 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+```bash
+# First-time setup (generates .env interactively)
+go run ./cmd/setup
+
+# Generate templ templates and sqlc code (required before build after template/query changes)
+make generate          # runs: templ generate && sqlc generate
+
+# Run tests
+go test ./...
+
+# Run a single test
+go test ./internal/fortnox/... -run TestChargeVoucherSE
+
+# Build binary
+make build             # output: bin/server
+
+# Run server (development)
+go run ./cmd/server
+
+# Watch mode (two terminals)
+# Terminal 1: templ generate --watch
+# Terminal 2: go run ./cmd/server
+
+# Docker
+docker compose up -d
+docker compose logs -f
+```
+
+## Architecture
+
+This is a self-hosted Go web app that syncs Stripe payment data to Fortnox (Swedish accounting) as double-entry vouchers.
+
+**Request flow:** `cmd/server/main.go` wires all dependencies → chi router → `internal/handler/` → services in `internal/stripe/`, `internal/fortnox/`, `internal/db/`
+
+**Key layers:**
+- `internal/config/` — env-driven config loaded at startup
+- `internal/database/` — opens SQLite, sets pragmas (WAL, FK, 32MB cache), runs embedded goose migrations; max 1 open connection
+- `internal/db/` — **sqlc-generated** query code (do not edit manually); source queries live in `sql/queries/`
+- `internal/stripe/` — incremental sync and webhook processing; converts Stripe objects to DB rows
+- `internal/fortnox/` — voucher creation with Swedish accounting rules (VAT, BAS accounts, reverse VAT for fees); two-phase write: INSERT pending row → POST to Fortnox → UPDATE to confirmed
+- `internal/views/` — Templ HTML templates (`.go` files are generated; edit `.templ` source files)
+- `internal/handler/` — HTTP handlers for dashboard, sync, settings, webhook, auth
+
+**Accounting rules baked in:**
+- Account 1521 = Stripe clearing account (shared across charge/payout vouchers)
+- Revenue routing: SE/unknown → 3010, EU → 3007, RoW → 3008
+- SE/unknown charges get 25% VAT split; EU charges are VAT-exempt
+- Stripe processing fees use reverse VAT (omvänd moms, 25%)
+
+**sqlc workflow:** edit `sql/queries/*.sql` → run `sqlc generate` → commit generated `internal/db/queries.sql.go`
+
+**Templ workflow:** edit `internal/views/*.templ` → run `templ generate` → commit generated `*_templ.go` files
+
+---
+
 # Agent Instructions
 
 ## Walkthrough ↔ Tests coupling (MANDATORY)

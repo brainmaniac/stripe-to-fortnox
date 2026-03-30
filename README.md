@@ -37,48 +37,94 @@ This section describes what the app actually does, end to end. Each bullet is co
 
 - **Account 1521 as the Stripe clearing account**: Account 1521 bridges charges and payouts. Every sale credits 1521 (money owed by Stripe), and every payout debits 1521 (money received from Stripe). Its running balance matches the Stripe dashboard balance at all times.
 
-## Quick Start
+## Getting Started
 
-### 1. Copy and configure environment
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
+- Go 1.23+ (only needed if running outside Docker or running setup wizard)
+
+### 1. Run the setup wizard
 
 ```sh
-cp .env.example .env
+go run ./cmd/setup
 ```
 
-Edit `.env` and fill in:
-- `ADMIN_PASSWORD_HASH` — bcrypt hash of your admin password
-- `SESSION_SECRET` — random 32-byte hex string
-- `STRIPE_API_KEY` — your Stripe API key
-- `STRIPE_WEBHOOK_SECRET` — from Stripe webhook settings
-- `FORTNOX_CLIENT_ID` / `FORTNOX_CLIENT_SECRET` — from Fortnox developer portal
-- `BASE_URL` — public URL of this app (for OAuth callbacks)
+The wizard walks you through every required key — Stripe, Fortnox, admin password — and writes a `.env` file. The admin password is hashed with bcrypt and the session secret is generated automatically. You only need to run it once.
 
-Generate a password hash:
-```sh
-htpasswd -bnBC 10 "" 'yourpassword' | tr -d ':\n' | sed 's/$2y/$2a/'
-```
-
-Generate a session secret:
-```sh
-openssl rand -hex 32
-```
-
-### 2. Run with Docker
+### 2. Start the app
 
 ```sh
 docker compose up -d
 ```
 
-Open http://localhost:8080 and log in with your password.
+Open http://localhost:8080 and log in with the password you set in step 1.
 
 ### 3. Connect Fortnox
 
-Go to **Inställningar** and click **Anslut Fortnox** to start the OAuth2 flow.
+Go to **Inställningar** and click **Anslut Fortnox** to complete the OAuth2 flow. You'll be redirected back automatically.
 
-### 4. Sync data
+### 4. Pull data and create vouchers
 
-- Go to **Synkronisering** and click **Hämta från Stripe** to pull the latest data
-- Click **Skicka till Fortnox** to create accounting vouchers
+1. Go to **Synkronisering** → **Hämta från Stripe** to pull charges, payouts, and customers
+2. Click **Skicka till Fortnox** to create accounting vouchers from the synced data
+
+### 5. Set up Stripe webhook (optional, for real-time updates)
+
+Point your Stripe webhook to `https://your-domain/webhook/stripe` and enable the events listed in the [Stripe Webhook](#stripe-webhook) section below.
+
+---
+
+## Deploying to a VPS
+
+The included GitHub Actions workflow (`.github/workflows/deploy.yml`) SSHes to your server on every push to `main`, clones the repo if needed, and rebuilds the Docker image in place.
+
+### Server prerequisites
+
+On your Debian VPS, install Docker and Docker Compose:
+
+```sh
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER   # allow your deploy user to run docker
+```
+
+### One-time server setup
+
+SSH into your VPS and run the setup wizard to create the `.env` file:
+
+```sh
+git clone <your-repo-url> /opt/stripe-fortnox-sync
+cd /opt/stripe-fortnox-sync
+go run ./cmd/setup       # generates .env — only needed once
+```
+
+The `.env` file is never committed and will survive future `git pull`s.
+
+### GitHub repository secrets
+
+Add these secrets under **Settings → Secrets → Actions** in your GitHub repo:
+
+| Secret | Example |
+|--------|---------|
+| `VPS_HOST` | `123.456.78.90` or `myserver.example.com` |
+| `VPS_USER` | `deploy` |
+| `VPS_SSH_KEY` | `-----BEGIN OPENSSH PRIVATE KEY-----\nAAA...` |
+| `VPS_DEPLOY_PATH` | `/opt/stripe-fortnox-sync` |
+| `VPS_REPO_URL` | `git@github.com:youruser/stripe-till-fortnox.git` |
+
+For `VPS_SSH_KEY`, generate a dedicated key pair and add the public key to `~/.ssh/authorized_keys` on the VPS:
+
+```sh
+ssh-keygen -t ed25519 -C "github-actions-deploy" -f deploy_key
+# Add deploy_key.pub to ~/.ssh/authorized_keys on the VPS
+# Paste deploy_key (private) as the VPS_SSH_KEY secret
+```
+
+If the repository is private, also add the VPS's SSH public key as a [deploy key](https://docs.github.com/en/authentication/connecting-to-new-services/managing-deploy-keys) in the repo so it can `git clone`/`git pull`.
+
+### Deploy
+
+Push to `main`. The workflow runs tests first — if they pass, it deploys. You can watch it under the **Actions** tab.
 
 ## Local Development
 

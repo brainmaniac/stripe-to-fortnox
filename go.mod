@@ -9,7 +9,8 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/pressly/goose/v3 v3.24.1
 	github.com/stripe/stripe-go/v84 v84.0.0
-	golang.org/x/crypto v0.37.0
+	golang.org/x/crypto v0.31.0
+	golang.org/x/term v0.27.0
 	golang.org/x/time v0.11.0
 	modernc.org/sqlite v1.37.0
 )
