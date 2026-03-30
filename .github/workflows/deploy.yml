@@ -45,7 +45,7 @@ jobs:
             cd "$DEPLOY_PATH"
 
             if [ ! -f ".env" ]; then
-              echo "No .env file found. SSH into the server and run: go run ./cmd/setup"
+              echo "::warning::No .env file found on VPS. SSH in and run: go run ./cmd/setup"
               exit 0
             fi
 
