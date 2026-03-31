@@ -3,7 +3,7 @@ module stripe-fortnox-sync
 go 1.23.0
 
 require (
-	github.com/a-h/templ v0.2.476
+	github.com/a-h/templ v0.3.1001
 	github.com/alexedwards/scs/v2 v2.8.0
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/joho/godotenv v1.5.1
@@ -25,8 +25,8 @@ require (
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
-	golang.org/x/sync v0.12.0 // indirect
-	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/sync v0.16.0 // indirect
+	golang.org/x/sys v0.34.0 // indirect
 	modernc.org/libc v1.62.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.9.1 // indirect
