@@ -6,7 +6,7 @@ type StripeCustomer struct {
 	ID                string
 	Email             sql.NullString
 	Name              sql.NullString
-	Metadata          sql.NullString
+	Country           sql.NullString
 	CreatedAt         int64
 	FortnoxCustomerID sql.NullString
 }

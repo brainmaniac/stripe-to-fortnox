@@ -21,22 +21,22 @@ templ Dashboard(d DashboardData) {
 	@Layout("Översikt") {
 		<h1 class="page-title">Översikt</h1>
 		<div class="stats-grid">
-			<div class="stat-card">
+			<a href="/customers" class="stat-card">
 				<div class="stat-value">{ fmt.Sprintf("%d", d.TotalCustomers) }</div>
 				<div class="stat-label">Kunder</div>
-			</div>
-			<div class="stat-card">
+			</a>
+			<a href="/charges" class="stat-card">
 				<div class="stat-value">{ fmt.Sprintf("%d", d.TotalCharges) }</div>
 				<div class="stat-label">Betalningar</div>
-			</div>
-			<div class="stat-card">
+			</a>
+			<a href="/payouts" class="stat-card">
 				<div class="stat-value">{ fmt.Sprintf("%d", d.TotalPayouts) }</div>
 				<div class="stat-label">Utbetalningar</div>
-			</div>
-			<div class="stat-card">
+			</a>
+			<a href="/vouchers" class="stat-card">
 				<div class="stat-value">{ fmt.Sprintf("%d", d.TotalVouchers) }</div>
 				<div class="stat-label">Verifikationer</div>
-			</div>
+			</a>
 		</div>
 		if d.UnsyncedCharges > 0 || d.UnsyncedPayouts > 0 {
 			<div class="alert alert-warning">

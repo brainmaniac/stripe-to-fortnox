@@ -45,7 +45,8 @@ func main() {
 	sessionManager := scs.New()
 	sessionManager.Lifetime = 24 * time.Hour
 	sessionManager.Cookie.HttpOnly = true
-	sessionManager.Cookie.SameSite = http.SameSiteLaxMode
+	sessionManager.Cookie.SameSite = http.SameSiteNoneMode
+	sessionManager.Cookie.Secure = true
 
 	// Stripe
 	stripeSyncer := stripepkg.NewSyncer(cfg.StripeAPIKey, queries)
@@ -88,8 +89,12 @@ func main() {
 		r.Get("/auth/fortnox", settingsHandler.FortnoxAuthorize)
 		r.Post("/sync/stripe", syncHandler.TriggerStripeSync)
 		r.Post("/sync/fortnox", syncHandler.TriggerFortnoxSync)
+		r.Post("/sync/fortnox/retry/{id}", syncHandler.RetryPendingVoucher)
 		r.Get("/sync", syncHandler.SyncPage)
 		r.Get("/vouchers", syncHandler.ListVouchers)
+		r.Get("/customers", syncHandler.ListCustomers)
+		r.Get("/charges", syncHandler.ListCharges)
+		r.Get("/payouts", syncHandler.ListPayouts)
 		r.Get("/logs", syncHandler.SyncLogs)
 	})
 

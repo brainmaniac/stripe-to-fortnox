@@ -44,6 +44,20 @@ This section describes what the app actually does, end to end. Each bullet is co
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose
 - Go 1.23+ (only needed if running outside Docker or running setup wizard)
 
+### What you need from Stripe
+
+1. **Secret API key** — Go to **Stripe Dashboard → Developers → API keys** and copy the **Secret key** (`sk_live_...` or `sk_test_...`). Do not use the publishable key.
+2. **Webhook signing secret** — Create a webhook endpoint (see [Stripe Webhook](#stripe-webhook) below), then copy the **Signing secret** (`whsec_...`) shown after creation.
+
+### What you need from Fortnox
+
+1. **Client ID and Client Secret** — You need to create an integration in the Fortnox developer portal:
+   - Go to [developer.fortnox.se](https://developer.fortnox.se) and sign in
+   - Create a new app and request the scopes: `bookkeeping`, `invoice`, `customer`, `companyinformation`
+   - Copy the **Client ID** and **Client Secret**
+2. **Redirect URI** — Set the redirect URI in your Fortnox app to `https://your-domain/auth/fortnox/callback`. You'll connect the account after the app is running via the settings page.
+3. **Fiscal years** — Fortnox requires an open fiscal year (bokföringsår) to exist for any date you want to create vouchers for. Make sure your fiscal years are set up in Fortnox under **Inställningar → Bokföringsår** before syncing historical data.
+
 ### 1. Run the setup wizard
 
 ```sh
@@ -142,6 +156,23 @@ Run tests:
 ```sh
 go test ./...
 ```
+
+### Testing Fortnox OAuth and Stripe webhooks locally
+
+Fortnox OAuth and Stripe webhooks require a public HTTPS URL to reach your local server. Use [ngrok](https://ngrok.com) to expose it:
+
+```sh
+ngrok http 8080
+```
+
+This gives you a URL like `https://abc123.ngrok-free.app`. Then:
+
+1. Set `BASE_URL=https://abc123.ngrok-free.app` in your `.env` and restart the server
+2. Update the redirect URI in your Fortnox app to `https://abc123.ngrok-free.app/auth/fortnox/callback`
+3. Update your Stripe webhook endpoint to `https://abc123.ngrok-free.app/webhook/stripe`
+4. **Access the app via the ngrok URL** (not localhost) — the Fortnox OAuth flow stores state in a session cookie that requires the full HTTPS round-trip to work correctly
+
+Note: the ngrok URL changes every time you restart ngrok (unless you have a paid plan with a fixed domain). You'll need to update the Fortnox redirect URI and Stripe webhook URL each time.
 
 ## Accounting Model
 

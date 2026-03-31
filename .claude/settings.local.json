@@ -12,7 +12,11 @@
       "WebSearch",
       "WebFetch(domain:developer.fortnox.se)",
       "WebFetch(domain:www.fortnox.se)",
-      "Bash(go test:*)"
+      "Bash(go test:*)",
+      "Bash(curl -O https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-darwin-amd64.zip)",
+      "Bash(unzip ngrok-v3-stable-darwin-amd64.zip)",
+      "Bash(sudo mv:*)",
+      "Bash(grep:*)"
     ]
   }
 }

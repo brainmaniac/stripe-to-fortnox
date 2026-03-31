@@ -10,6 +10,8 @@ type SyncPageData struct {
 	SyncStates      []db.SyncState
 	UnsyncedCharges int64
 	UnsyncedPayouts int64
+	UnsyncedChargeList []db.StripeCharge
+	UnsyncedPayoutList []db.StripePayout
 	PendingVouchers []db.FortnoxVoucher
 	Flash           string
 }
@@ -22,6 +24,9 @@ templ SyncPage(d SyncPageData) {
 		}
 		if d.Flash == "fortnox_sync_started" {
 			<div class="flash flash-success">Verifikationsskapande i Fortnox startad i bakgrunden.</div>
+		}
+		if d.Flash == "retry_started" {
+			<div class="flash flash-success">Försöker skicka verifikationen igen.</div>
 		}
 		<section class="section">
 			<h2>Hämta från Stripe</h2>
@@ -44,6 +49,62 @@ templ SyncPage(d SyncPageData) {
 				<button type="submit" class="btn btn-primary">Skicka till Fortnox</button>
 			</form>
 		</section>
+		if len(d.UnsyncedChargeList) > 0 || len(d.UnsyncedPayoutList) > 0 {
+			<section class="section">
+				<h2>Ej skickade verifikationer</h2>
+				<p class="text-muted">Betalningar och utbetalningar som finns lokalt men inte skickats till Fortnox ännu.</p>
+				if len(d.UnsyncedChargeList) > 0 {
+					<h3>Betalningar ({ fmt.Sprintf("%d", len(d.UnsyncedChargeList)) })</h3>
+					<table class="table">
+						<thead>
+							<tr>
+								<th>ID</th>
+								<th>Belopp</th>
+								<th>Valuta</th>
+								<th>Status</th>
+								<th>Beskrivning</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, c := range d.UnsyncedChargeList {
+								<tr>
+									<td>{ c.ID }</td>
+									<td>{ fmt.Sprintf("%.2f", float64(c.Amount)/100) }</td>
+									<td>{ c.Currency }</td>
+									<td>{ c.Status }</td>
+									<td>{ c.Description.String }</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				}
+				if len(d.UnsyncedPayoutList) > 0 {
+					<h3>Utbetalningar ({ fmt.Sprintf("%d", len(d.UnsyncedPayoutList)) })</h3>
+					<table class="table">
+						<thead>
+							<tr>
+								<th>ID</th>
+								<th>Belopp</th>
+								<th>Valuta</th>
+								<th>Status</th>
+								<th>Ankomstdatum</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, p := range d.UnsyncedPayoutList {
+								<tr>
+									<td>{ p.ID }</td>
+									<td>{ fmt.Sprintf("%.2f", float64(p.Amount)/100) }</td>
+									<td>{ p.Currency }</td>
+									<td>{ p.Status }</td>
+									<td>{ fmt.Sprintf("%d", p.ArrivalDate) }</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				}
+			</section>
+		}
 		if len(d.PendingVouchers) > 0 {
 			<section class="section">
 				<h2>⚠ Ej bekräftade verifikationer</h2>
@@ -58,6 +119,7 @@ templ SyncPage(d SyncPageData) {
 							<th>Datum</th>
 							<th>Beskrivning</th>
 							<th>Skapad</th>
+							<th></th>
 						</tr>
 					</thead>
 					<tbody>
@@ -68,6 +130,11 @@ templ SyncPage(d SyncPageData) {
 								<td>{ v.VoucherDate }</td>
 								<td>{ v.Description.String }</td>
 								<td>{ v.CreatedAt }</td>
+								<td>
+									<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/sync/fortnox/retry/%d", v.ID)) }>
+										<button type="submit" class="btn btn-sm btn-warning">Försök igen</button>
+									</form>
+								</td>
 							</tr>
 						}
 					</tbody>

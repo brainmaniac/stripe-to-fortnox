@@ -13,6 +13,12 @@ import (
 	"stripe-fortnox-sync/internal/db"
 )
 
+// startOfYear returns the Unix timestamp for Jan 1 of the current year (UTC).
+func startOfYear() int64 {
+	now := time.Now().UTC()
+	return time.Date(now.Year(), 1, 1, 0, 0, 0, 0, time.UTC).Unix()
+}
+
 // Syncer pulls data from Stripe and stores it in the local database.
 type Syncer struct {
 	api     *client.API
@@ -40,32 +46,24 @@ func (s *Syncer) SyncAll(ctx context.Context) error {
 }
 
 // SyncCustomers fetches customers from Stripe and upserts them locally.
-// Uses created[gte] for incremental syncs based on last_synced_at.
+// Uses MAX(created_at) from the local table as the incremental cursor.
 func (s *Syncer) SyncCustomers(ctx context.Context) error {
-	state, err := s.queries.GetSyncState(ctx, "customers")
-	if err != nil {
-		return fmt.Errorf("get sync state: %w", err)
-	}
 	if err := s.queries.SetSyncStatus(ctx, "running", "customers"); err != nil {
 		return err
 	}
-
-	// Record the start time before we pull — ensures we don't miss objects
-	// created during the sync window on the next run.
-	syncStarted := time.Now().Unix()
-
 	defer func() { _ = s.queries.SetSyncStatus(ctx, "idle", "customers") }()
 
 	params := &stripelib.CustomerListParams{}
 	params.Filters.AddFilter("limit", "", "100")
-	if state != nil && state.LastSyncedAt.Valid && state.LastSyncedAt.Int64 > 0 {
-		// 60-second buffer to handle clock skew and objects created at the boundary.
-		ts := state.LastSyncedAt.Int64 - 60
-		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(ts, 10))
+	maxAt, _ := s.queries.MaxCustomerCreatedAt(ctx)
+	if maxAt > 0 {
+		// Incremental: only fetch customers created since the last known one.
+		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(maxAt-10, 10))
 	}
+	// On first run (empty table): no date filter — pull all customers so that
+	// foreign key constraints on charges are satisfied.
 
 	iter := s.api.Customers.List(params)
-	var lastID string
 	count := 0
 	for iter.Next() {
 		c := iter.Customer()
@@ -78,40 +76,35 @@ func (s *Syncer) SyncCustomers(ctx context.Context) error {
 			continue
 		}
 		_ = s.queries.InsertSyncLog(ctx, "customers", c.ID, "synced_from_stripe", "")
-		lastID = c.ID
 		count++
 	}
 	if err := iter.Err(); err != nil {
 		_ = s.queries.SetSyncStatus(ctx, "error", "customers")
 		return fmt.Errorf("list customers: %w", err)
 	}
-	_ = s.queries.UpdateSyncState(ctx, lastID, syncStarted, "idle", "customers")
+	_ = s.queries.SetSyncStatus(ctx, "idle", "customers")
 	log.Printf("synced %d customers", count)
 	return nil
 }
 
 // SyncCharges fetches charges from Stripe and upserts them locally.
-// Uses created[gte] for incremental syncs.
+// Uses MAX(created_at) from the local table as the incremental cursor.
 func (s *Syncer) SyncCharges(ctx context.Context) error {
-	state, err := s.queries.GetSyncState(ctx, "charges")
-	if err != nil {
-		return fmt.Errorf("get sync state: %w", err)
-	}
 	if err := s.queries.SetSyncStatus(ctx, "running", "charges"); err != nil {
 		return err
 	}
-	syncStarted := time.Now().Unix()
 	defer func() { _ = s.queries.SetSyncStatus(ctx, "idle", "charges") }()
 
 	params := &stripelib.ChargeListParams{}
 	params.Filters.AddFilter("limit", "", "100")
-	if state != nil && state.LastSyncedAt.Valid && state.LastSyncedAt.Int64 > 0 {
-		ts := state.LastSyncedAt.Int64 - 60
-		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(ts, 10))
+	maxAt, _ := s.queries.MaxChargeCreatedAt(ctx)
+	if maxAt > 0 {
+		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(maxAt-10, 10))
+	} else {
+		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(startOfYear(), 10))
 	}
 
 	iter := s.api.Charges.List(params)
-	var lastID string
 	count := 0
 	for iter.Next() {
 		c := iter.Charge()
@@ -121,39 +114,34 @@ func (s *Syncer) SyncCharges(ctx context.Context) error {
 			continue
 		}
 		_ = s.queries.InsertSyncLog(ctx, "charges", c.ID, "synced_from_stripe", "")
-		lastID = c.ID
 		count++
 	}
 	if err := iter.Err(); err != nil {
 		_ = s.queries.SetSyncStatus(ctx, "error", "charges")
 		return fmt.Errorf("list charges: %w", err)
 	}
-	_ = s.queries.UpdateSyncState(ctx, lastID, syncStarted, "idle", "charges")
 	log.Printf("synced %d charges", count)
 	return nil
 }
 
 // SyncPayouts fetches payouts and triggers balance-transaction sync for paid ones.
+// Uses MAX(created_at) from the local table as the incremental cursor.
 func (s *Syncer) SyncPayouts(ctx context.Context) error {
-	state, err := s.queries.GetSyncState(ctx, "payouts")
-	if err != nil {
-		return fmt.Errorf("get sync state: %w", err)
-	}
 	if err := s.queries.SetSyncStatus(ctx, "running", "payouts"); err != nil {
 		return err
 	}
-	syncStarted := time.Now().Unix()
 	defer func() { _ = s.queries.SetSyncStatus(ctx, "idle", "payouts") }()
 
 	params := &stripelib.PayoutListParams{}
 	params.Filters.AddFilter("limit", "", "100")
-	if state != nil && state.LastSyncedAt.Valid && state.LastSyncedAt.Int64 > 0 {
-		ts := state.LastSyncedAt.Int64 - 60
-		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(ts, 10))
+	maxAt, _ := s.queries.MaxPayoutCreatedAt(ctx)
+	if maxAt > 0 {
+		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(maxAt-10, 10))
+	} else {
+		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(startOfYear(), 10))
 	}
 
 	iter := s.api.Payouts.List(params)
-	var lastID string
 	count := 0
 	for iter.Next() {
 		p := iter.Payout()
@@ -180,14 +168,12 @@ func (s *Syncer) SyncPayouts(ctx context.Context) error {
 			}(p.ID)
 		}
 		_ = s.queries.InsertSyncLog(ctx, "payouts", p.ID, "synced_from_stripe", "")
-		lastID = p.ID
 		count++
 	}
 	if err := iter.Err(); err != nil {
 		_ = s.queries.SetSyncStatus(ctx, "error", "payouts")
 		return fmt.Errorf("list payouts: %w", err)
 	}
-	_ = s.queries.UpdateSyncState(ctx, lastID, syncStarted, "idle", "payouts")
 	log.Printf("synced %d payouts", count)
 	return nil
 }

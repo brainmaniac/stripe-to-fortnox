@@ -15,25 +15,25 @@ func nullStr(s string) sql.NullString {
 
 // ── Stripe Customers ──────────────────────────────────────────────────────────
 
-func (q *Queries) UpsertStripeCustomer(ctx context.Context, id, email, name, metadata string, createdAt int64) error {
+func (q *Queries) UpsertStripeCustomer(ctx context.Context, id, email, name, country string, createdAt int64) error {
 	const query = `
-INSERT INTO stripe_customers (id, email, name, metadata, created_at)
+INSERT INTO stripe_customers (id, email, name, country, created_at)
 VALUES (?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
-    email    = excluded.email,
-    name     = excluded.name,
-    metadata = excluded.metadata`
-	_, err := q.db.ExecContext(ctx, query, id, nullStr(email), nullStr(name), nullStr(metadata), createdAt)
+    email   = excluded.email,
+    name    = excluded.name,
+    country = excluded.country`
+	_, err := q.db.ExecContext(ctx, query, id, nullStr(email), nullStr(name), nullStr(country), createdAt)
 	return err
 }
 
 func (q *Queries) GetStripeCustomer(ctx context.Context, id string) (*StripeCustomer, error) {
 	const query = `
-SELECT id, email, name, metadata, created_at, fortnox_customer_id
+SELECT id, email, name, country, created_at, fortnox_customer_id
 FROM stripe_customers WHERE id = ? LIMIT 1`
 	row := q.db.QueryRowContext(ctx, query, id)
 	c := &StripeCustomer{}
-	err := row.Scan(&c.ID, &c.Email, &c.Name, &c.Metadata, &c.CreatedAt, &c.FortnoxCustomerID)
+	err := row.Scan(&c.ID, &c.Email, &c.Name, &c.Country, &c.CreatedAt, &c.FortnoxCustomerID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -44,6 +44,97 @@ func (q *Queries) SetFortnoxCustomerID(ctx context.Context, fortnoxID, stripeID 
 	_, err := q.db.ExecContext(ctx,
 		`UPDATE stripe_customers SET fortnox_customer_id = ? WHERE id = ?`, fortnoxID, stripeID)
 	return err
+}
+
+func (q *Queries) MaxCustomerCreatedAt(ctx context.Context) (int64, error) {
+	var ts sql.NullInt64
+	err := q.db.QueryRowContext(ctx, `SELECT MAX(created_at) FROM stripe_customers`).Scan(&ts)
+	if err != nil || !ts.Valid {
+		return 0, err
+	}
+	return ts.Int64, nil
+}
+
+func (q *Queries) MaxChargeCreatedAt(ctx context.Context) (int64, error) {
+	var ts sql.NullInt64
+	err := q.db.QueryRowContext(ctx, `SELECT MAX(created_at) FROM stripe_charges`).Scan(&ts)
+	if err != nil || !ts.Valid {
+		return 0, err
+	}
+	return ts.Int64, nil
+}
+
+func (q *Queries) MaxPayoutCreatedAt(ctx context.Context) (int64, error) {
+	var ts sql.NullInt64
+	err := q.db.QueryRowContext(ctx, `SELECT MAX(created_at) FROM stripe_payouts`).Scan(&ts)
+	if err != nil || !ts.Valid {
+		return 0, err
+	}
+	return ts.Int64, nil
+}
+
+func (q *Queries) ListStripeCustomers(ctx context.Context, limit, offset int64) ([]StripeCustomer, error) {
+	const query = `
+SELECT id, email, name, country, created_at, fortnox_customer_id
+FROM stripe_customers ORDER BY created_at DESC LIMIT ? OFFSET ?`
+	rows, err := q.db.QueryContext(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var customers []StripeCustomer
+	for rows.Next() {
+		c := StripeCustomer{}
+		if err := rows.Scan(&c.ID, &c.Email, &c.Name, &c.Country, &c.CreatedAt, &c.FortnoxCustomerID); err != nil {
+			return nil, err
+		}
+		customers = append(customers, c)
+	}
+	return customers, rows.Err()
+}
+
+func (q *Queries) ListStripeCharges(ctx context.Context, limit, offset int64) ([]StripeCharge, error) {
+	const query = `
+SELECT id, payment_intent_id, amount, amount_captured, currency, status,
+       balance_transaction_id, customer_id, description, metadata, created_at, billing_country
+FROM stripe_charges ORDER BY created_at DESC LIMIT ? OFFSET ?`
+	rows, err := q.db.QueryContext(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var charges []StripeCharge
+	for rows.Next() {
+		c := StripeCharge{}
+		if err := rows.Scan(&c.ID, &c.PaymentIntentID, &c.Amount, &c.AmountCaptured,
+			&c.Currency, &c.Status, &c.BalanceTransactionID, &c.CustomerID,
+			&c.Description, &c.Metadata, &c.CreatedAt, &c.BillingCountry); err != nil {
+			return nil, err
+		}
+		charges = append(charges, c)
+	}
+	return charges, rows.Err()
+}
+
+func (q *Queries) ListStripePayouts(ctx context.Context, limit, offset int64) ([]StripePayout, error) {
+	const query = `
+SELECT id, amount, currency, arrival_date, status, description, created_at, synced_at, fortnox_voucher_id
+FROM stripe_payouts ORDER BY created_at DESC LIMIT ? OFFSET ?`
+	rows, err := q.db.QueryContext(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var payouts []StripePayout
+	for rows.Next() {
+		p := StripePayout{}
+		if err := rows.Scan(&p.ID, &p.Amount, &p.Currency, &p.ArrivalDate,
+			&p.Status, &p.Description, &p.CreatedAt, &p.SyncedAt, &p.FortnoxVoucherID); err != nil {
+			return nil, err
+		}
+		payouts = append(payouts, p)
+	}
+	return payouts, rows.Err()
 }
 
 func (q *Queries) CountStripeCustomers(ctx context.Context) (int64, error) {
@@ -435,6 +526,12 @@ FROM fortnox_vouchers WHERE fortnox_voucher_number IS NULL ORDER BY created_at D
 		vouchers = append(vouchers, v)
 	}
 	return vouchers, rows.Err()
+}
+
+// DeleteFortnoxVoucher removes a pending voucher row so the source can be retried.
+func (q *Queries) DeleteFortnoxVoucher(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, `DELETE FROM fortnox_vouchers WHERE id = ?`, id)
+	return err
 }
 
 func (q *Queries) CountPendingFortnoxVouchers(ctx context.Context) (int64, error) {

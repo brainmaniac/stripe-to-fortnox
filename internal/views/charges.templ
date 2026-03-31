@@ -1,0 +1,78 @@
+package views
+
+import (
+	"fmt"
+	"stripe-fortnox-sync/internal/db"
+)
+
+type ChargesData struct {
+	Charges  []db.StripeCharge
+	Total    int64
+	Page     int64
+	PageSize int64
+}
+
+templ Charges(d ChargesData) {
+	@Layout("Betalningar") {
+		<h1 class="page-title">Betalningar</h1>
+		<p class="text-muted">{ fmt.Sprintf("Totalt: %d betalningar", d.Total) }</p>
+		if len(d.Charges) == 0 {
+			<p>Inga betalningar ännu. <a href="/sync">Hämta från Stripe</a> för att synka.</p>
+		} else {
+			<table class="table">
+				<thead>
+					<tr>
+						<th>ID</th>
+						<th>Belopp</th>
+						<th>Valuta</th>
+						<th>Status</th>
+						<th>Land</th>
+						<th>Beskrivning</th>
+						<th>Skapad</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, c := range d.Charges {
+						<tr>
+							<td><code>{ c.ID }</code></td>
+							<td>{ fmt.Sprintf("%.2f", float64(c.Amount)/100) }</td>
+							<td>{ c.Currency }</td>
+							<td>{ c.Status }</td>
+							<td>
+								if c.BillingCountry.Valid {
+									{ c.BillingCountry.String }
+								}
+							</td>
+							<td>
+								if c.Description.Valid {
+									{ c.Description.String }
+								}
+							</td>
+							<td>{ fmt.Sprintf("%d", c.CreatedAt) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			@chargePagination(d)
+		}
+	}
+}
+
+templ chargePagination(d ChargesData) {
+	<div class="pagination">
+		if d.Page > 1 {
+			<a href={ templ.SafeURL(fmt.Sprintf("/charges?page=%d", d.Page-1)) } class="btn btn-sm">← Föregående</a>
+		}
+		<span class="pagination-info">
+			{ fmt.Sprintf("Sida %d – visar %d–%d av %d",
+				d.Page,
+				(d.Page-1)*d.PageSize+1,
+				min64(d.Page*d.PageSize, d.Total),
+				d.Total,
+			) }
+		</span>
+		if d.Page*d.PageSize < d.Total {
+			<a href={ templ.SafeURL(fmt.Sprintf("/charges?page=%d", d.Page+1)) } class="btn btn-sm">Nästa →</a>
+		}
+	</div>
+}

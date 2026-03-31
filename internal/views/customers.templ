@@ -1,0 +1,78 @@
+package views
+
+import (
+	"fmt"
+	"stripe-fortnox-sync/internal/db"
+)
+
+type CustomersData struct {
+	Customers []db.StripeCustomer
+	Total     int64
+	Page      int64
+	PageSize  int64
+}
+
+templ Customers(d CustomersData) {
+	@Layout("Kunder") {
+		<h1 class="page-title">Kunder</h1>
+		<p class="text-muted">{ fmt.Sprintf("Totalt: %d kunder", d.Total) }</p>
+		if len(d.Customers) == 0 {
+			<p>Inga kunder ännu. <a href="/sync">Hämta från Stripe</a> för att synka.</p>
+		} else {
+			<table class="table">
+				<thead>
+					<tr>
+						<th>ID</th>
+						<th>E-post</th>
+						<th>Namn</th>
+						<th>Land</th>
+						<th>Skapad</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, c := range d.Customers {
+						<tr>
+							<td><code>{ c.ID }</code></td>
+							<td>
+								if c.Email.Valid {
+									{ c.Email.String }
+								}
+							</td>
+							<td>
+								if c.Name.Valid {
+									{ c.Name.String }
+								}
+							</td>
+							<td>
+								if c.Country.Valid {
+									{ c.Country.String }
+								}
+							</td>
+							<td>{ fmt.Sprintf("%d", c.CreatedAt) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			@customerPagination(d)
+		}
+	}
+}
+
+templ customerPagination(d CustomersData) {
+	<div class="pagination">
+		if d.Page > 1 {
+			<a href={ templ.SafeURL(fmt.Sprintf("/customers?page=%d", d.Page-1)) } class="btn btn-sm">← Föregående</a>
+		}
+		<span class="pagination-info">
+			{ fmt.Sprintf("Sida %d – visar %d–%d av %d",
+				d.Page,
+				(d.Page-1)*d.PageSize+1,
+				min64(d.Page*d.PageSize, d.Total),
+				d.Total,
+			) }
+		</span>
+		if d.Page*d.PageSize < d.Total {
+			<a href={ templ.SafeURL(fmt.Sprintf("/customers?page=%d", d.Page+1)) } class="btn btn-sm">Nästa →</a>
+		}
+	</div>
+}

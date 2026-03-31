@@ -1,0 +1,68 @@
+package views
+
+import (
+	"fmt"
+	"stripe-fortnox-sync/internal/db"
+)
+
+type PayoutsData struct {
+	Payouts  []db.StripePayout
+	Total    int64
+	Page     int64
+	PageSize int64
+}
+
+templ Payouts(d PayoutsData) {
+	@Layout("Utbetalningar") {
+		<h1 class="page-title">Utbetalningar</h1>
+		<p class="text-muted">{ fmt.Sprintf("Totalt: %d utbetalningar", d.Total) }</p>
+		if len(d.Payouts) == 0 {
+			<p>Inga utbetalningar ännu. <a href="/sync">Hämta från Stripe</a> för att synka.</p>
+		} else {
+			<table class="table">
+				<thead>
+					<tr>
+						<th>ID</th>
+						<th>Belopp</th>
+						<th>Valuta</th>
+						<th>Status</th>
+						<th>Ankomstdatum</th>
+						<th>Skapad</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, p := range d.Payouts {
+						<tr>
+							<td><code>{ p.ID }</code></td>
+							<td>{ fmt.Sprintf("%.2f", float64(p.Amount)/100) }</td>
+							<td>{ p.Currency }</td>
+							<td>{ p.Status }</td>
+							<td>{ fmt.Sprintf("%d", p.ArrivalDate) }</td>
+							<td>{ fmt.Sprintf("%d", p.CreatedAt) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			@payoutPagination(d)
+		}
+	}
+}
+
+templ payoutPagination(d PayoutsData) {
+	<div class="pagination">
+		if d.Page > 1 {
+			<a href={ templ.SafeURL(fmt.Sprintf("/payouts?page=%d", d.Page-1)) } class="btn btn-sm">← Föregående</a>
+		}
+		<span class="pagination-info">
+			{ fmt.Sprintf("Sida %d – visar %d–%d av %d",
+				d.Page,
+				(d.Page-1)*d.PageSize+1,
+				min64(d.Page*d.PageSize, d.Total),
+				d.Total,
+			) }
+		</span>
+		if d.Page*d.PageSize < d.Total {
+			<a href={ templ.SafeURL(fmt.Sprintf("/payouts?page=%d", d.Page+1)) } class="btn btn-sm">Nästa →</a>
+		}
+	</div>
+}
