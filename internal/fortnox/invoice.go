@@ -124,8 +124,10 @@ func (s *InvoiceService) CreateInvoice(ctx context.Context, charge db.StripeChar
 	}
 
 	countryCode := ""
-	if charge.BillingCountry.Valid {
+	if charge.BillingCountry.Valid && charge.BillingCountry.String != "" {
 		countryCode = charge.BillingCountry.String
+	} else if customer != nil && customer.Country.Valid && customer.Country.String != "" {
+		countryCode = customer.Country.String
 	}
 
 	mapping, err := s.resolver.RevenueMapping(ctx, countryCode)
