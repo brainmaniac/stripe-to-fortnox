@@ -54,6 +54,49 @@ func (h *SettingsHandler) Settings(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// CreateMapping inserts a new row into account_mappings (upserts on kontotyp+matchkod conflict).
+func (h *SettingsHandler) CreateMapping(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	kontotyp := r.FormValue("kontotyp")
+	matchtyp := r.FormValue("matchtyp")
+	matchkod := r.FormValue("matchkod")
+	konto := r.FormValue("konto")
+	momssatsStr := r.FormValue("momssats")
+
+	if kontotyp == "" || matchkod == "" || konto == "" {
+		h.renderSettings(w, r, "danger", "Kontotyp, matchkod och konto är obligatoriska.")
+		return
+	}
+
+	m := db.AccountMapping{
+		Kontotyp: kontotyp,
+		Matchtyp: matchtyp,
+		Matchkod: matchkod,
+		Konto:    konto,
+	}
+	if momssatsStr != "" {
+		v, err := strconv.ParseFloat(momssatsStr, 64)
+		if err != nil {
+			h.renderSettings(w, r, "danger", "Ogiltig momssats: "+momssatsStr)
+			return
+		}
+		m.Momssats.Float64 = v
+		m.Momssats.Valid = true
+	}
+
+	if err := h.queries.UpsertAccountMapping(ctx, m); err != nil {
+		log.Printf("create mapping: %v", err)
+		h.renderSettings(w, r, "danger", "Kunde inte spara: "+err.Error())
+		return
+	}
+	h.renderSettings(w, r, "success", "Kontomappning skapad.")
+}
+
 // UpdateMapping saves konto and momssats for a single account_mappings row.
 func (h *SettingsHandler) UpdateMapping(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()

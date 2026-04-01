@@ -215,14 +215,14 @@ func Settings(d SettingsData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</tbody></table></section><section class=\"section\"><h2>Automatisk synkronisering</h2><p class=\"text-muted\">Hur ofta appen automatiskt hämtar från Stripe och skickar till Fortnox. Sätt till 0 för att inaktivera.</p><form method=\"POST\" action=\"/settings/sync-interval\"><div class=\"form-group\" style=\"max-width:300px\"><label>Intervall (minuter)</label> <input type=\"number\" name=\"sync_interval_minutes\" class=\"form-control\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</tbody></table><h3 style=\"margin-top:1.5rem\">Lägg till mappning</h3><form method=\"POST\" action=\"/settings/accounts\" style=\"max-width:800px\"><table class=\"table\"><thead><tr><th>Kontotyp</th><th>Matchtyp</th><th>Matchkod</th><th>Konto</th><th>Momssats %</th><th></th></tr></thead> <tbody><tr><td><input type=\"text\" name=\"kontotyp\" class=\"form-control\" placeholder=\"t.ex. Intäktskonto\" required></td><td><select name=\"matchtyp\" class=\"form-control\"><option value=\"Landskod\">Landskod</option> <option value=\"Valuta\">Valuta</option></select></td><td><input type=\"text\" name=\"matchkod\" class=\"form-control\" placeholder=\"t.ex. SE\" required></td><td><input type=\"text\" name=\"konto\" class=\"form-control\" style=\"max-width:90px\" required></td><td><input type=\"text\" name=\"momssats\" class=\"form-control\" style=\"max-width:80px\" placeholder=\"–\"></td><td><button type=\"submit\" class=\"btn btn-sm btn-success\">Lägg till</button></td></tr></tbody></table></form></section><section class=\"section\"><h2>Automatisk synkronisering</h2><p class=\"text-muted\">Hur ofta appen automatiskt hämtar från Stripe och skickar till Fortnox. Sätt till 0 för att inaktivera.</p><form method=\"POST\" action=\"/settings/sync-interval\"><div class=\"form-group\" style=\"max-width:300px\"><label>Intervall (minuter)</label> <input type=\"number\" name=\"sync_interval_minutes\" class=\"form-control\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(d.SyncIntervalMinutes)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settings.templ`, Line: 80, Col: 105}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settings.templ`, Line: 110, Col: 105}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {

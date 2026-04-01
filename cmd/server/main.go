@@ -92,6 +92,7 @@ func main() {
 		r.Get("/", dashboardHandler.Dashboard)
 		r.Post("/logout", authHandler.Logout)
 		r.Get("/settings", settingsHandler.Settings)
+		r.Post("/settings/accounts", settingsHandler.CreateMapping)
 		r.Post("/settings/accounts/{id}", settingsHandler.UpdateMapping)
 		r.Post("/settings/sync-interval", settingsHandler.SaveSyncInterval)
 		r.Post("/settings/fortnox/disconnect", settingsHandler.FortnoxDisconnect)

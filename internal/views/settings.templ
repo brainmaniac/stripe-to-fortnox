@@ -70,6 +70,36 @@ templ Settings(d SettingsData) {
 					}
 				</tbody>
 			</table>
+			<h3 style="margin-top:1.5rem">Lägg till mappning</h3>
+			<form method="POST" action="/settings/accounts" style="max-width:800px">
+				<table class="table">
+					<thead>
+						<tr>
+							<th>Kontotyp</th>
+							<th>Matchtyp</th>
+							<th>Matchkod</th>
+							<th>Konto</th>
+							<th>Momssats %</th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td><input type="text" name="kontotyp" class="form-control" placeholder="t.ex. Intäktskonto" required/></td>
+							<td>
+								<select name="matchtyp" class="form-control">
+									<option value="Landskod">Landskod</option>
+									<option value="Valuta">Valuta</option>
+								</select>
+							</td>
+							<td><input type="text" name="matchkod" class="form-control" placeholder="t.ex. SE" required/></td>
+							<td><input type="text" name="konto" class="form-control" style="max-width:90px" required/></td>
+							<td><input type="text" name="momssats" class="form-control" style="max-width:80px" placeholder="–"/></td>
+							<td><button type="submit" class="btn btn-sm btn-success">Lägg till</button></td>
+						</tr>
+					</tbody>
+				</table>
+			</form>
 		</section>
 		<section class="section">
 			<h2>Automatisk synkronisering</h2>
