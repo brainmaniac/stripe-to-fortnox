@@ -19,6 +19,12 @@ func startOfYear() int64 {
 	return time.Date(now.Year(), 1, 1, 0, 0, 0, 0, time.UTC).Unix()
 }
 
+// startOfLastYear returns the Unix timestamp for Jan 1 of last year (UTC).
+func startOfLastYear() int64 {
+	now := time.Now().UTC()
+	return time.Date(now.Year()-1, 1, 1, 0, 0, 0, 0, time.UTC).Unix()
+}
+
 // Syncer pulls data from Stripe and stores it in the local database.
 type Syncer struct {
 	api     *client.API
@@ -59,9 +65,10 @@ func (s *Syncer) SyncCustomers(ctx context.Context) error {
 	if maxAt > 0 {
 		// Incremental: only fetch customers created since the last known one.
 		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(maxAt-10, 10))
+	} else {
+		// First run: cap to start of last year to avoid pulling all history.
+		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(startOfLastYear(), 10))
 	}
-	// On first run (empty table): no date filter — pull all customers so that
-	// foreign key constraints on charges are satisfied.
 
 	iter := s.api.Customers.List(params)
 	count := 0

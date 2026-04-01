@@ -72,7 +72,7 @@ The wizard walks you through every required key — Stripe, Fortnox, admin passw
 docker compose up -d
 ```
 
-Open http://localhost:8080 and log in with the password you set in step 1.
+Open http://localhost and log in with the password you set in step 1.
 
 ### 3. Connect Fortnox
 
