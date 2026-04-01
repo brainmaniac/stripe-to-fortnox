@@ -38,6 +38,15 @@ type StripeCharge struct {
 	CreatedAt            int64
 	BillingCountry       sql.NullString // ISO 3166-1 alpha-2, from BillingDetails.Address.Country
 	FortnoxInvoiceNumber sql.NullString // set after invoice created in Fortnox; "LEGACY" for old-flow charges
+	FortnoxInvoicePaid   bool           // true after MarkInvoicePaid succeeded for this charge
+}
+
+// ChargePaymentNeeded is returned by ListChargesNeedingInvoicePayment.
+// It pairs a charge (with a Fortnox invoice) with the arrival date of its already-synced payout,
+// so MarkInvoicePaid can be called retroactively.
+type ChargePaymentNeeded struct {
+	StripeCharge
+	PayoutArrivalDate int64
 }
 
 type AccountMapping struct {

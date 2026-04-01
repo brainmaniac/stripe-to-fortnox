@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -197,7 +198,8 @@ func (s *InvoiceService) CreateInvoice(ctx context.Context, charge db.StripeChar
 
 // MarkInvoicePaid records an invoice payment in Fortnox, crediting the Stripe clearing account (1521).
 // amountOre is the full invoice amount in öre (the same as the original charge amount).
-func (s *InvoiceService) MarkInvoicePaid(ctx context.Context, invoiceNumber string, amountOre int64, paymentDate time.Time) error {
+// chargeID is stored locally to track that this payment has been recorded (idempotency).
+func (s *InvoiceService) MarkInvoicePaid(ctx context.Context, invoiceNumber, chargeID string, amountOre int64, paymentDate time.Time) error {
 	clearingKonto, err := s.resolver.AccountByKontotyp(ctx, KontotypAvstämningskonto, "SEK")
 	if err != nil {
 		return fmt.Errorf("resolve clearing account: %w", err)
@@ -215,6 +217,12 @@ func (s *InvoiceService) MarkInvoicePaid(ctx context.Context, invoiceNumber stri
 
 	if _, err := s.api.Post(ctx, "invoicepayments", req); err != nil {
 		return fmt.Errorf("post invoicepayment: %w", err)
+	}
+
+	if chargeID != "" {
+		if err := s.queries.SetChargeInvoicePaid(ctx, chargeID); err != nil {
+			log.Printf("set invoice paid flag for charge %s: %v", chargeID, err)
+		}
 	}
 
 	return nil

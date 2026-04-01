@@ -56,6 +56,7 @@ func (h *SyncHandler) TriggerFortnoxSync(w http.ResponseWriter, r *http.Request)
 	go func() {
 		ctx := context.Background()
 		syncChargesToFortnox(ctx, h.queries, h.stripeSyncer, h.invoiceService)
+		reconcileInvoicePayments(ctx, h.queries, h.invoiceService)
 		syncPayoutsToFortnox(ctx, h.queries, h.invoiceService, h.voucherCreator)
 	}()
 	if r.Header.Get("HX-Request") == "true" {
@@ -113,6 +114,25 @@ func syncChargesToFortnox(ctx context.Context, queries *db.Queries, stripeSyncer
 	}
 }
 
+// reconcileInvoicePayments finds charges that have a Fortnox invoice but whose invoice payment
+// was never recorded (e.g. because the payout was synced before the charge was invoiced).
+// Safe to run repeatedly — charges with fortnox_invoice_paid=1 are skipped.
+func reconcileInvoicePayments(ctx context.Context, queries *db.Queries, invoiceService *fortnox.InvoiceService) {
+	charges, err := queries.ListChargesNeedingInvoicePayment(ctx)
+	if err != nil {
+		log.Printf("reconcile invoice payments: list: %v", err)
+		return
+	}
+	for _, r := range charges {
+		payoutDate := time.Unix(r.PayoutArrivalDate, 0)
+		if err := invoiceService.MarkInvoicePaid(ctx, r.FortnoxInvoiceNumber.String, r.ID, r.Amount, payoutDate); err != nil {
+			log.Printf("reconcile: mark invoice paid %s for charge %s: %v", r.FortnoxInvoiceNumber.String, r.ID, err)
+		} else {
+			log.Printf("reconcile: marked invoice %s paid for charge %s", r.FortnoxInvoiceNumber.String, r.ID)
+		}
+	}
+}
+
 // syncPayoutsToFortnox processes each unsynced payout:
 // for every charge in the payout's balance transactions it records the invoice payment
 // and creates a fee voucher, then creates the payout voucher (bank ← clearing).
@@ -164,11 +184,12 @@ func processPayout(
 			continue
 		}
 
-		// Mark the invoice paid if the charge was synced via the invoice flow.
+		// Mark the invoice paid if the charge was synced via the invoice flow and not already recorded.
 		if charge.FortnoxInvoiceNumber.Valid &&
 			charge.FortnoxInvoiceNumber.String != "" &&
-			charge.FortnoxInvoiceNumber.String != "LEGACY" {
-			if err := invoiceService.MarkInvoicePaid(ctx, charge.FortnoxInvoiceNumber.String, charge.Amount, payoutDate); err != nil {
+			charge.FortnoxInvoiceNumber.String != "LEGACY" &&
+			!charge.FortnoxInvoicePaid {
+			if err := invoiceService.MarkInvoicePaid(ctx, charge.FortnoxInvoiceNumber.String, chargeID, charge.Amount, payoutDate); err != nil {
 				log.Printf("mark invoice paid %s for charge %s: %v", charge.FortnoxInvoiceNumber.String, chargeID, err)
 			}
 		}

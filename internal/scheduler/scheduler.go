@@ -118,8 +118,9 @@ func (s *Scheduler) syncAll(ctx context.Context) {
 
 			if charge.FortnoxInvoiceNumber.Valid &&
 				charge.FortnoxInvoiceNumber.String != "" &&
-				charge.FortnoxInvoiceNumber.String != "LEGACY" {
-				if err := s.invoiceService.MarkInvoicePaid(ctx, charge.FortnoxInvoiceNumber.String, charge.Amount, payoutDate); err != nil {
+				charge.FortnoxInvoiceNumber.String != "LEGACY" &&
+				!charge.FortnoxInvoicePaid {
+				if err := s.invoiceService.MarkInvoicePaid(ctx, charge.FortnoxInvoiceNumber.String, chargeID, charge.Amount, payoutDate); err != nil {
 					log.Printf("scheduler: mark invoice paid %s: %v", charge.FortnoxInvoiceNumber.String, err)
 				}
 			}

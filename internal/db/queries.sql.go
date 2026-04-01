@@ -97,7 +97,7 @@ func (q *Queries) ListStripeCharges(ctx context.Context, limit, offset int64) ([
 	const query = `
 SELECT id, payment_intent_id, amount, amount_captured, currency, status,
        balance_transaction_id, customer_id, description, metadata, created_at, billing_country,
-       fortnox_invoice_number
+       fortnox_invoice_number, fortnox_invoice_paid
 FROM stripe_charges ORDER BY created_at DESC LIMIT ? OFFSET ?`
 	rows, err := q.db.QueryContext(ctx, query, limit, offset)
 	if err != nil {
@@ -110,7 +110,7 @@ FROM stripe_charges ORDER BY created_at DESC LIMIT ? OFFSET ?`
 		if err := rows.Scan(&c.ID, &c.PaymentIntentID, &c.Amount, &c.AmountCaptured,
 			&c.Currency, &c.Status, &c.BalanceTransactionID, &c.CustomerID,
 			&c.Description, &c.Metadata, &c.CreatedAt, &c.BillingCountry,
-			&c.FortnoxInvoiceNumber); err != nil {
+			&c.FortnoxInvoiceNumber, &c.FortnoxInvoicePaid); err != nil {
 			return nil, err
 		}
 		charges = append(charges, c)
@@ -225,6 +225,48 @@ func (q *Queries) SetChargeFortnoxInvoiceNumber(ctx context.Context, chargeID, i
 	return err
 }
 
+func (q *Queries) SetChargeInvoicePaid(ctx context.Context, chargeID string) error {
+	_, err := q.db.ExecContext(ctx,
+		`UPDATE stripe_charges SET fortnox_invoice_paid = 1 WHERE id = ?`, chargeID)
+	return err
+}
+
+// ListChargesNeedingInvoicePayment returns charges that have a Fortnox invoice but whose
+// invoice payment has not yet been recorded, and whose payout is already confirmed in Fortnox.
+func (q *Queries) ListChargesNeedingInvoicePayment(ctx context.Context) ([]ChargePaymentNeeded, error) {
+	const query = `
+SELECT sc.id, sc.payment_intent_id, sc.amount, sc.amount_captured, sc.currency, sc.status,
+       sc.balance_transaction_id, sc.customer_id, sc.description, sc.metadata, sc.created_at,
+       sc.billing_country, sc.fortnox_invoice_number, sc.fortnox_invoice_paid,
+       sp.arrival_date
+FROM stripe_charges sc
+JOIN stripe_balance_transactions bt ON bt.source_id = sc.id AND bt.type = 'charge' AND bt.payout_id IS NOT NULL
+JOIN stripe_payouts sp ON sp.id = bt.payout_id
+JOIN fortnox_vouchers fv ON fv.source_id = bt.payout_id AND fv.source_type = 'payout' AND fv.status = 'confirmed'
+WHERE sc.fortnox_invoice_number IS NOT NULL
+  AND sc.fortnox_invoice_number NOT IN ('', 'LEGACY')
+  AND sc.fortnox_invoice_paid = 0`
+	rows, err := q.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []ChargePaymentNeeded
+	for rows.Next() {
+		var r ChargePaymentNeeded
+		if err := rows.Scan(
+			&r.ID, &r.PaymentIntentID, &r.Amount, &r.AmountCaptured, &r.Currency, &r.Status,
+			&r.BalanceTransactionID, &r.CustomerID, &r.Description, &r.Metadata, &r.CreatedAt,
+			&r.BillingCountry, &r.FortnoxInvoiceNumber, &r.FortnoxInvoicePaid,
+			&r.PayoutArrivalDate,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
 func (q *Queries) UpsertStripeCharge(ctx context.Context, c StripeCharge) error {
 	const query = `
 INSERT INTO stripe_charges (id, payment_intent_id, amount, amount_captured, currency, status,
@@ -246,13 +288,13 @@ func (q *Queries) GetStripeCharge(ctx context.Context, id string) (*StripeCharge
 	const query = `
 SELECT id, payment_intent_id, amount, amount_captured, currency, status,
     balance_transaction_id, customer_id, description, metadata, created_at, billing_country,
-    fortnox_invoice_number
+    fortnox_invoice_number, fortnox_invoice_paid
 FROM stripe_charges WHERE id = ? LIMIT 1`
 	row := q.db.QueryRowContext(ctx, query, id)
 	c := &StripeCharge{}
 	err := row.Scan(&c.ID, &c.PaymentIntentID, &c.Amount, &c.AmountCaptured, &c.Currency,
 		&c.Status, &c.BalanceTransactionID, &c.CustomerID, &c.Description, &c.Metadata, &c.CreatedAt,
-		&c.BillingCountry, &c.FortnoxInvoiceNumber)
+		&c.BillingCountry, &c.FortnoxInvoiceNumber, &c.FortnoxInvoicePaid)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -263,7 +305,7 @@ func (q *Queries) ListUnsyncedCharges(ctx context.Context) ([]StripeCharge, erro
 	const query = `
 SELECT id, payment_intent_id, amount, amount_captured, currency, status,
     balance_transaction_id, customer_id, description, metadata, created_at, billing_country,
-    fortnox_invoice_number
+    fortnox_invoice_number, fortnox_invoice_paid
 FROM stripe_charges
 WHERE status = 'succeeded' AND fortnox_invoice_number IS NULL
 ORDER BY created_at ASC`
@@ -277,7 +319,7 @@ ORDER BY created_at ASC`
 		c := StripeCharge{}
 		if err := rows.Scan(&c.ID, &c.PaymentIntentID, &c.Amount, &c.AmountCaptured, &c.Currency,
 			&c.Status, &c.BalanceTransactionID, &c.CustomerID, &c.Description, &c.Metadata, &c.CreatedAt,
-			&c.BillingCountry, &c.FortnoxInvoiceNumber); err != nil {
+			&c.BillingCountry, &c.FortnoxInvoiceNumber, &c.FortnoxInvoicePaid); err != nil {
 			return nil, err
 		}
 		charges = append(charges, c)
