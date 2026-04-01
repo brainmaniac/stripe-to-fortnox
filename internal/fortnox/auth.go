@@ -42,7 +42,7 @@ func (o *OAuthClient) AuthorizeURL(state string) string {
 		"response_type": {"code"},
 		"client_id":     {o.clientID},
 		"redirect_uri":  {o.redirectURI},
-		"scope":         {"bookkeeping invoice customer companyinformation payment costcenter supplier supplierpayments developerapi"},
+		"scope":         {"bookkeeping invoice customer companyinformation payment costcenter supplier supplierinvoice"},
 		"state":         {state},
 	}
 	return authorizeURL + "?" + params.Encode()
