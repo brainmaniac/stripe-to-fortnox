@@ -19,23 +19,23 @@ This section describes what the app actually does, end to end. Each bullet is co
 
 - **Real-time updates via webhook**: Stripe sends event notifications to `/webhook/stripe`. The app processes `charge.succeeded`, `charge.updated`, `charge.refunded`, `payout.paid`, `payout.updated`, `payout.reconciliation_completed`, `customer.created`, and `customer.updated` in real time, keeping the local database current without waiting for the next manual sync.
 
-- **Revenue account routing by billing country**: Each charge carries a billing country from Stripe's BillingDetails field. The app uses this to pick the correct Fortnox revenue account: Sweden (SE or unknown) → 3010, EU member states → 3007, rest of world → 3008.
+- **Revenue account routing by billing country**: Each charge carries a billing country from Stripe's BillingDetails field. The app uses this to pick the correct Fortnox revenue account — configurable in Inställningar → Kontomappning: Sweden (SE or unknown) → 3010, EU member states → 3007, rest of world → 3008. All charges are invoiced with 25% VAT.
 
-- **Charge voucher — Swedish / unknown country**: For each unsynced succeeded charge with a Swedish or unknown billing country, a voucher is created with 25% VAT split out: debit 1521 (Stripe clearing), credit 3010 (net revenue, 80%) + credit 2611 (output VAT 25%, 20%).
+- **Charge → Fortnox invoice (B-series)**: For each unsynced succeeded charge, the app creates a customer in Fortnox (if needed) and posts an invoice via `POST /3/invoices`. Fortnox auto-creates the B-series voucher (debit 1510 kundfordringar, credit revenue account + VAT). The Fortnox invoice number is stored on the charge to prevent duplicates.
 
-- **Charge voucher — EU and international**: For EU and international charges, no Swedish VAT is applied. The full charge amount goes to the revenue account: debit 1521, credit 3007 (EU) or 3008 (rest of world).
+- **Payout → invoice payment + fee voucher + payout voucher**: When a payout arrives, the app: (1) marks each related invoice as paid via `POST /3/invoicepayments` (Fortnox auto-creates the C-series voucher crediting 1521), (2) creates a fee voucher with reverse VAT (omvänd moms) for each Stripe processing fee, and (3) creates a payout voucher recording the bank transfer: debit 1930, credit 1521.
 
-- **Payout voucher**: When a payout is pushed to Fortnox, a voucher is created that records the money moving from Stripe to the bank: debit 1930 (bank account), credit 1521 (Stripe clearing).
+- **Fee voucher with reverse VAT (omvänd moms)**: For each Stripe processing fee, a voucher is created. Because Stripe Ltd is an Irish EU company, reverse VAT (omvänd skattskyldighet) applies: debit 6065 (payment fee) + debit 2645 (reverse VAT debit), credit 2614 (reverse VAT credit) + credit 1521 (Stripe clearing). The reversal entries cancel each other — only the fee cost hits the P&L.
 
-- **Fee voucher with reverse VAT (omvänd moms)**: For each Stripe processing fee, a separate voucher is created. Because Stripe Ltd is an Irish EU company, reverse VAT (omvänd skattskyldighet) applies: debit 6065 (payment fee) + debit 2645 (reverse VAT debit), credit 2614 (reverse VAT credit) + credit 1521 (Stripe clearing). The reversal entries cancel each other — only the fee cost hits the P&L.
-
-- **All vouchers are balanced (double-entry)**: Every voucher's debit total equals its credit total. The app validates this before calling Fortnox and rejects any imbalanced voucher.
+- **All vouchers are balanced (double-entry)**: Every payout and fee voucher's debit total equals its credit total. The app validates this before calling Fortnox and rejects any imbalanced voucher.
 
 - **Stripe data is idempotent (UPSERT)**: All Stripe data — charges, payouts, customers, balance transactions — is written with `INSERT … ON CONFLICT DO UPDATE`. Re-running a sync or receiving a duplicate webhook event never creates duplicate records.
 
-- **Fortnox vouchers are idempotent (two-phase write)**: Before calling Fortnox, the app inserts a pending row locally using `INSERT OR IGNORE`. After a successful Fortnox response, the row is updated with the Fortnox voucher number. If the process crashes between the API call and the database update, the pending row remains — it is surfaced on the Sync page as a warning. The charge or payout is **not** retried automatically; it is excluded from the unsynced list so you can check Fortnox manually and decide whether to void a duplicate.
+- **Charge invoices are idempotent**: Once a Fortnox invoice number is stored on a charge (`fortnox_invoice_number`), the charge is excluded from the unsynced list and no second invoice is created. Payout and fee vouchers use the existing two-phase pending/confirmed write pattern.
 
-- **Account 1521 as the Stripe clearing account**: Account 1521 bridges charges and payouts. Every sale credits 1521 (money owed by Stripe), and every payout debits 1521 (money received from Stripe). Its running balance matches the Stripe dashboard balance at all times.
+- **Account 1521 as the Stripe clearing account**: Account 1521 bridges charges and payouts. Every invoice payment credits 1521 (money owed by Stripe), and every payout debits 1521 (money received from Stripe). Its running balance matches the Stripe dashboard balance at all times.
+
+- **Configurable account mappings (Kontomappning)**: Revenue accounts, clearing account, bank account, and fee accounts are configurable in Inställningar → Kontomappning. Defaults match the Swedish BAS-kontoplan.
 
 ## Getting Started
 

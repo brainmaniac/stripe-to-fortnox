@@ -58,15 +58,17 @@ func main() {
 	fortnoxOAuth := fortnox.NewOAuthClient(cfg.FortnoxClientID, cfg.FortnoxClientSecret, cfg.BaseURL, queries)
 	fortnoxAPI := fortnox.NewAPIClient(fortnoxOAuth)
 	voucherCreator := fortnox.NewVoucherCreator(fortnoxAPI, queries, fortnox.DefaultAccountConfig())
+	mappingResolver := fortnox.NewMappingResolver(queries)
+	invoiceService := fortnox.NewInvoiceService(fortnoxAPI, queries, mappingResolver)
 
 	// Scheduler
-	sched := scheduler.New(queries, stripeSyncer, voucherCreator)
+	sched := scheduler.New(queries, stripeSyncer, voucherCreator, invoiceService)
 	sched.Start(context.Background())
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(sessionManager, cfg.AdminPasswordHash)
 	dashboardHandler := handler.NewDashboardHandler(queries, fortnoxOAuth)
-	syncHandler := handler.NewSyncHandler(queries, stripeSyncer, voucherCreator)
+	syncHandler := handler.NewSyncHandler(queries, stripeSyncer, voucherCreator, invoiceService)
 	settingsHandler := handler.NewSettingsHandler(queries, fortnoxOAuth, cfg, sessionManager)
 	webhookHandler := handler.NewWebhookHandler(stripeWebhookHandler)
 
@@ -90,7 +92,7 @@ func main() {
 		r.Get("/", dashboardHandler.Dashboard)
 		r.Post("/logout", authHandler.Logout)
 		r.Get("/settings", settingsHandler.Settings)
-		r.Post("/settings/accounts", settingsHandler.SaveAccountSettings)
+		r.Post("/settings/accounts/{id}", settingsHandler.UpdateMapping)
 		r.Post("/settings/sync-interval", settingsHandler.SaveSyncInterval)
 		r.Post("/settings/fortnox/disconnect", settingsHandler.FortnoxDisconnect)
 		r.Get("/auth/fortnox", settingsHandler.FortnoxAuthorize)

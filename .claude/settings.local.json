@@ -16,7 +16,8 @@
       "Bash(curl -O https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-darwin-amd64.zip)",
       "Bash(unzip ngrok-v3-stable-darwin-amd64.zip)",
       "Bash(sudo mv:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "WebFetch(domain:support.fortnox.se)"
     ]
   }
 }

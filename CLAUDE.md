@@ -91,14 +91,14 @@ The `## Walkthrough` section of `README.md` is the canonical description of what
 | Balance transaction sync | `internal/db/queries_test.go`: `TestBalanceTransactionsPerPayout` |
 | Real-time updates via webhook | `internal/stripe/sync_test.go`: `TestChargeFromStripeRefundedStatus`, `TestChargeFromStripeFieldMapping` |
 | Revenue account routing by billing country | `internal/fortnox/voucher_test.go`: `TestRevenueAccountRouting` |
-| Charge voucher — Swedish / unknown country | `internal/fortnox/voucher_test.go`: `TestChargeVoucherSE`, `TestSEVATSplit`, `TestVoucherBalancedCharge` |
-| Charge voucher — EU and international | `internal/fortnox/voucher_test.go`: `TestChargeVoucherEU`, `TestChargeVoucherWO`, `TestVoucherBalancedCharge` |
-| Payout voucher | `internal/fortnox/voucher_test.go`: `TestPayoutVoucherBalance`, `TestPayoutVoucherAccounts` |
-| Fee voucher with reverse VAT | `internal/fortnox/voucher_test.go`: `TestFeeVoucherReverseVAT` |
-| All vouchers are balanced | `internal/fortnox/voucher_test.go`: `TestVoucherBalancedCharge`, `TestPayoutVoucherBalance`, `TestPostVoucherRejectsImbalanced` |
+| Charge → Fortnox invoice (B-series via /3/invoices) | `internal/fortnox/voucher_test.go`: `TestRevenueAccountRouting` |
+| Charge invoice idempotent via fortnox_invoice_number | `internal/db/queries_test.go`: `TestListUnsyncedChargesPendingAndConfirmed` |
+| Payout voucher (C-series) + invoicepayment per charge + fee voucher | `internal/fortnox/voucher_test.go`: `TestPayoutVoucherBalance`, `TestPayoutVoucherAccounts`, `TestFeeVoucherReverseVAT` |
+| All vouchers are balanced | `internal/fortnox/voucher_test.go`: `TestPayoutVoucherBalance`, `TestPostVoucherRejectsImbalanced` |
 | Stripe data is idempotent (UPSERT) | `internal/db/queries_test.go`: `TestUpsertStripeChargeIdempotent`, `TestUpsertStripePayoutIdempotent`, `TestUpsertStripeCustomerIdempotent`, `TestUpsertStripeBalanceTransactionIdempotent`, `TestUpsertChargePreservesBillingCountry` |
-| Fortnox vouchers are idempotent (two-phase write) | `internal/fortnox/voucher_test.go`: `TestChargeVoucherIdempotentConfirmed`, `TestChargeVoucherFailedFortnoxLeavesPendingRow`; `internal/db/queries_test.go`: `TestInsertPendingVoucherIdempotent`, `TestListUnsyncedChargesPendingAndConfirmed`, `TestListUnsyncedPayoutsPendingAndConfirmed` |
+| Payout vouchers are idempotent (two-phase write) | `internal/fortnox/voucher_test.go`: `TestChargeVoucherIdempotentConfirmed`, `TestChargeVoucherFailedFortnoxLeavesPendingRow`; `internal/db/queries_test.go`: `TestInsertPendingVoucherIdempotent`, `TestListUnsyncedPayoutsPendingAndConfirmed` |
 | Account 1521 as clearing account | `internal/fortnox/voucher_test.go`: `TestStripeClearingAccountIsShared`, `TestPayoutVoucherAccounts` |
+| Account mappings configurable per country group | `internal/db/queries_test.go`: covers via `TestListUnsyncedChargesPendingAndConfirmed` (uses migrated seed data) |
 
 ## Technology notes
 

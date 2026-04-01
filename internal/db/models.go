@@ -37,6 +37,16 @@ type StripeCharge struct {
 	Metadata             sql.NullString
 	CreatedAt            int64
 	BillingCountry       sql.NullString // ISO 3166-1 alpha-2, from BillingDetails.Address.Country
+	FortnoxInvoiceNumber sql.NullString // set after invoice created in Fortnox; "LEGACY" for old-flow charges
+}
+
+type AccountMapping struct {
+	ID       int64
+	Kontotyp string
+	Matchtyp string
+	Matchkod string
+	Konto    string
+	Momssats sql.NullFloat64
 }
 
 type StripePayout struct {

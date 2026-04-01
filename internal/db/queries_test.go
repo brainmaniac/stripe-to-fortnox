@@ -169,7 +169,7 @@ func TestUpsertChargePreservesBillingCountry(t *testing.T) {
 	}
 }
 
-// ── Bullet 11: ListUnsyncedCharges includes pending, excludes confirmed ────────
+// ── Bullet 11: ListUnsyncedCharges excludes charges with fortnox_invoice_number set ────────
 
 func TestListUnsyncedChargesPendingAndConfirmed(t *testing.T) {
 	q := testutil.NewTestDB(t)
@@ -195,35 +195,18 @@ func TestListUnsyncedChargesPendingAndConfirmed(t *testing.T) {
 		t.Fatalf("expected 2 unsynced, got %d", len(charges))
 	}
 
-	// Insert a pending voucher for ch_a (no voucher number yet).
-	_ = q.InsertPendingFortnoxVoucher(ctx, db.FortnoxVoucher{
-		FortnoxVoucherSeries: "A",
-		VoucherDate:          "2025-01-01",
-		SourceType:           "charge",
-		SourceID:             "ch_a",
-		TotalDebit:           10000,
-		TotalCredit:          10000,
-	})
+	// Set fortnox_invoice_number for ch_a (invoice created in Fortnox).
+	if err := q.SetChargeFortnoxInvoiceNumber(ctx, "ch_a", "1001"); err != nil {
+		t.Fatalf("set invoice number: %v", err)
+	}
 
-	// ch_a should no longer appear — a pending row blocks automatic retry.
+	// ch_a should no longer appear in the unsynced list.
 	charges, _ = q.ListUnsyncedCharges(ctx)
 	if len(charges) != 1 {
-		t.Errorf("pending row should remove charge from unsynced list; got %d", len(charges))
+		t.Errorf("charge with invoice number should be excluded; got %d", len(charges))
 	}
 	if charges[0].ID != "ch_b" {
 		t.Errorf("expected ch_b, got %s", charges[0].ID)
-	}
-
-	// Confirm ch_a.
-	_ = q.ConfirmFortnoxVoucher(ctx, "V1", "{}", "charge", "ch_a")
-
-	// ch_a is still gone after confirm — confirmed also blocks unsynced list.
-	charges, _ = q.ListUnsyncedCharges(ctx)
-	if len(charges) != 1 {
-		t.Errorf("after confirm expected 1 unsynced, got %d", len(charges))
-	}
-	if charges[0].ID != "ch_b" {
-		t.Errorf("expected ch_b remaining, got %s", charges[0].ID)
 	}
 }
 

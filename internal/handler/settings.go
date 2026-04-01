@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/alexedwards/scs/v2"
+	"github.com/go-chi/chi/v5"
 
 	"stripe-fortnox-sync/internal/config"
 	"stripe-fortnox-sync/internal/db"
@@ -41,10 +43,10 @@ func NewSettingsHandler(
 func (h *SettingsHandler) Settings(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	data := views.SettingsData{
-		FortnoxConnected: h.fortnoxOAuth.IsConnected(ctx),
-		FortnoxClientID:  h.cfg.FortnoxClientID,
-		StripeKeySet:     h.cfg.StripeAPIKey != "",
-		AccountConfig:       h.loadAccountConfig(ctx),
+		FortnoxConnected:    h.fortnoxOAuth.IsConnected(ctx),
+		FortnoxClientID:     h.cfg.FortnoxClientID,
+		StripeKeySet:        h.cfg.StripeAPIKey != "",
+		AccountMappings:     h.loadAccountMappings(ctx),
 		SyncIntervalMinutes: h.loadSyncInterval(ctx),
 	}
 	if err := views.Settings(data).Render(ctx, w); err != nil {
@@ -52,38 +54,49 @@ func (h *SettingsHandler) Settings(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *SettingsHandler) SaveAccountSettings(w http.ResponseWriter, r *http.Request) {
+// UpdateMapping saves konto and momssats for a single account_mappings row.
+func (h *SettingsHandler) UpdateMapping(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
 
-	fields := map[string]string{
-		"account_stripe_clearing":    r.FormValue("stripe_clearing"),
-		"account_bank_account":       r.FormValue("bank_account"),
-		"account_revenue_se":         r.FormValue("revenue_se"),
-		"account_revenue_eu":         r.FormValue("revenue_eu"),
-		"account_revenue_wo":         r.FormValue("revenue_wo"),
-		"account_output_vat25":       r.FormValue("output_vat25"),
-		"account_payment_fee":        r.FormValue("payment_fee"),
-		"account_reverse_vat_debit":  r.FormValue("reverse_vat_debit"),
-		"account_reverse_vat_credit": r.FormValue("reverse_vat_credit"),
-		"voucher_series":             r.FormValue("voucher_series"),
-		"vat_percent":                r.FormValue("vat_percent"),
+	konto := r.FormValue("konto")
+	momssatsStr := r.FormValue("momssats")
+
+	m, err := h.queries.GetAccountMappingByID(ctx, id)
+	if err != nil || m == nil {
+		h.renderSettings(w, r, "danger", fmt.Sprintf("Kontomappning %d hittades inte.", id))
+		return
 	}
 
-	for key, value := range fields {
-		if value == "" {
-			continue
-		}
-		if err := h.queries.UpsertSetting(ctx, key, value, 0); err != nil {
-			log.Printf("save setting %s: %v", key, err)
-			h.renderSettings(w, r, "danger", "Failed to save settings: "+err.Error())
+	m.Konto = konto
+	if momssatsStr == "" {
+		m.Momssats.Valid = false
+	} else {
+		v, err := strconv.ParseFloat(momssatsStr, 64)
+		if err != nil {
+			h.renderSettings(w, r, "danger", "Ogiltig momssats: "+momssatsStr)
 			return
 		}
+		m.Momssats.Float64 = v
+		m.Momssats.Valid = true
 	}
-	h.renderSettings(w, r, "success", "Account settings saved.")
+
+	if err := h.queries.UpdateAccountMapping(ctx, *m); err != nil {
+		log.Printf("update mapping %d: %v", id, err)
+		h.renderSettings(w, r, "danger", "Kunde inte spara: "+err.Error())
+		return
+	}
+	h.renderSettings(w, r, "success", "Kontomappning sparad.")
 }
 
 func (h *SettingsHandler) FortnoxAuthorize(w http.ResponseWriter, r *http.Request) {
@@ -138,38 +151,39 @@ func (h *SettingsHandler) FortnoxDisconnect(w http.ResponseWriter, r *http.Reque
 func (h *SettingsHandler) renderSettings(w http.ResponseWriter, r *http.Request, flashKind, flashMsg string) {
 	ctx := r.Context()
 	data := views.SettingsData{
-		FortnoxConnected: h.fortnoxOAuth.IsConnected(ctx),
-		FortnoxClientID:  h.cfg.FortnoxClientID,
-		StripeKeySet:     h.cfg.StripeAPIKey != "",
-		FlashKind:        flashKind,
-		FlashMsg:         flashMsg,
-		AccountConfig:       h.loadAccountConfig(ctx),
+		FortnoxConnected:    h.fortnoxOAuth.IsConnected(ctx),
+		FortnoxClientID:     h.cfg.FortnoxClientID,
+		StripeKeySet:        h.cfg.StripeAPIKey != "",
+		FlashKind:           flashKind,
+		FlashMsg:            flashMsg,
+		AccountMappings:     h.loadAccountMappings(ctx),
 		SyncIntervalMinutes: h.loadSyncInterval(ctx),
 	}
 	views.Settings(data).Render(ctx, w)
 }
 
-func (h *SettingsHandler) loadAccountConfig(ctx context.Context) views.AccountConfigForm {
-	get := func(key, def string) string {
-		s, err := h.queries.GetSetting(ctx, key)
-		if err != nil || s == nil {
-			return def
+func (h *SettingsHandler) loadAccountMappings(ctx context.Context) []views.AccountMappingView {
+	mappings, err := h.queries.ListAccountMappings(ctx)
+	if err != nil {
+		log.Printf("list account mappings: %v", err)
+		return nil
+	}
+	result := make([]views.AccountMappingView, len(mappings))
+	for i, m := range mappings {
+		momssats := ""
+		if m.Momssats.Valid {
+			momssats = strconv.FormatFloat(m.Momssats.Float64, 'f', -1, 64)
 		}
-		return s.Value
+		result[i] = views.AccountMappingView{
+			ID:       m.ID,
+			Kontotyp: m.Kontotyp,
+			Matchtyp: m.Matchtyp,
+			Matchkod: m.Matchkod,
+			Konto:    m.Konto,
+			Momssats: momssats,
+		}
 	}
-	return views.AccountConfigForm{
-		StripeClearing:   get("account_stripe_clearing", fortnox.AccountStripeClearing),
-		BankAccount:      get("account_bank_account", fortnox.AccountBankAccount),
-		RevenueSE:        get("account_revenue_se", fortnox.AccountRevenueSE),
-		RevenueEU:        get("account_revenue_eu", fortnox.AccountRevenueEU),
-		RevenueWO:        get("account_revenue_wo", fortnox.AccountRevenueWO),
-		OutputVAT25:      get("account_output_vat25", fortnox.AccountOutputVAT25),
-		PaymentFee:       get("account_payment_fee", fortnox.AccountPaymentFee),
-		ReverseVATDebit:  get("account_reverse_vat_debit", fortnox.AccountReverseVATDebit),
-		ReverseVATCredit: get("account_reverse_vat_credit", fortnox.AccountReverseVATCredit),
-		VoucherSeries:    get("voucher_series", "A"),
-		VATPercent:       get("vat_percent", strconv.FormatFloat(25.0, 'f', -1, 64)),
-	}
+	return result
 }
 
 func (h *SettingsHandler) loadSyncInterval(ctx context.Context) string {

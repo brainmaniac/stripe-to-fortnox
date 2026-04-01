@@ -96,7 +96,8 @@ FROM stripe_customers ORDER BY created_at DESC LIMIT ? OFFSET ?`
 func (q *Queries) ListStripeCharges(ctx context.Context, limit, offset int64) ([]StripeCharge, error) {
 	const query = `
 SELECT id, payment_intent_id, amount, amount_captured, currency, status,
-       balance_transaction_id, customer_id, description, metadata, created_at, billing_country
+       balance_transaction_id, customer_id, description, metadata, created_at, billing_country,
+       fortnox_invoice_number
 FROM stripe_charges ORDER BY created_at DESC LIMIT ? OFFSET ?`
 	rows, err := q.db.QueryContext(ctx, query, limit, offset)
 	if err != nil {
@@ -108,12 +109,85 @@ FROM stripe_charges ORDER BY created_at DESC LIMIT ? OFFSET ?`
 		c := StripeCharge{}
 		if err := rows.Scan(&c.ID, &c.PaymentIntentID, &c.Amount, &c.AmountCaptured,
 			&c.Currency, &c.Status, &c.BalanceTransactionID, &c.CustomerID,
-			&c.Description, &c.Metadata, &c.CreatedAt, &c.BillingCountry); err != nil {
+			&c.Description, &c.Metadata, &c.CreatedAt, &c.BillingCountry,
+			&c.FortnoxInvoiceNumber); err != nil {
 			return nil, err
 		}
 		charges = append(charges, c)
 	}
 	return charges, rows.Err()
+}
+
+// ── Account Mappings ──────────────────────────────────────────────────────────
+
+func (q *Queries) ListAccountMappings(ctx context.Context) ([]AccountMapping, error) {
+	const query = `
+SELECT id, kontotyp, matchtyp, matchkod, konto, momssats
+FROM account_mappings ORDER BY kontotyp, matchkod`
+	rows, err := q.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var mappings []AccountMapping
+	for rows.Next() {
+		m := AccountMapping{}
+		if err := rows.Scan(&m.ID, &m.Kontotyp, &m.Matchtyp, &m.Matchkod, &m.Konto, &m.Momssats); err != nil {
+			return nil, err
+		}
+		mappings = append(mappings, m)
+	}
+	return mappings, rows.Err()
+}
+
+func (q *Queries) GetAccountMappingByID(ctx context.Context, id int64) (*AccountMapping, error) {
+	const query = `
+SELECT id, kontotyp, matchtyp, matchkod, konto, momssats
+FROM account_mappings WHERE id = ? LIMIT 1`
+	row := q.db.QueryRowContext(ctx, query, id)
+	m := &AccountMapping{}
+	err := row.Scan(&m.ID, &m.Kontotyp, &m.Matchtyp, &m.Matchkod, &m.Konto, &m.Momssats)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return m, err
+}
+
+func (q *Queries) GetAccountMapping(ctx context.Context, kontotyp, matchkod string) (*AccountMapping, error) {
+	const query = `
+SELECT id, kontotyp, matchtyp, matchkod, konto, momssats
+FROM account_mappings WHERE kontotyp = ? AND matchkod = ? LIMIT 1`
+	row := q.db.QueryRowContext(ctx, query, kontotyp, matchkod)
+	m := &AccountMapping{}
+	err := row.Scan(&m.ID, &m.Kontotyp, &m.Matchtyp, &m.Matchkod, &m.Konto, &m.Momssats)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return m, err
+}
+
+func (q *Queries) UpsertAccountMapping(ctx context.Context, m AccountMapping) error {
+	const query = `
+INSERT INTO account_mappings (kontotyp, matchtyp, matchkod, konto, momssats)
+VALUES (?, ?, ?, ?, ?)
+ON CONFLICT(kontotyp, matchkod) DO UPDATE SET
+    matchtyp = excluded.matchtyp,
+    konto    = excluded.konto,
+    momssats = excluded.momssats`
+	_, err := q.db.ExecContext(ctx, query, m.Kontotyp, m.Matchtyp, m.Matchkod, m.Konto, m.Momssats)
+	return err
+}
+
+func (q *Queries) UpdateAccountMapping(ctx context.Context, m AccountMapping) error {
+	const query = `
+UPDATE account_mappings SET matchtyp = ?, konto = ?, momssats = ? WHERE id = ?`
+	_, err := q.db.ExecContext(ctx, query, m.Matchtyp, m.Konto, m.Momssats, m.ID)
+	return err
+}
+
+func (q *Queries) DeleteAccountMapping(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, `DELETE FROM account_mappings WHERE id = ?`, id)
+	return err
 }
 
 func (q *Queries) ListStripePayouts(ctx context.Context, limit, offset int64) ([]StripePayout, error) {
@@ -145,6 +219,12 @@ func (q *Queries) CountStripeCustomers(ctx context.Context) (int64, error) {
 
 // ── Stripe Charges ────────────────────────────────────────────────────────────
 
+func (q *Queries) SetChargeFortnoxInvoiceNumber(ctx context.Context, chargeID, invoiceNumber string) error {
+	_, err := q.db.ExecContext(ctx,
+		`UPDATE stripe_charges SET fortnox_invoice_number = ? WHERE id = ?`, invoiceNumber, chargeID)
+	return err
+}
+
 func (q *Queries) UpsertStripeCharge(ctx context.Context, c StripeCharge) error {
 	const query = `
 INSERT INTO stripe_charges (id, payment_intent_id, amount, amount_captured, currency, status,
@@ -165,13 +245,14 @@ ON CONFLICT(id) DO UPDATE SET
 func (q *Queries) GetStripeCharge(ctx context.Context, id string) (*StripeCharge, error) {
 	const query = `
 SELECT id, payment_intent_id, amount, amount_captured, currency, status,
-    balance_transaction_id, customer_id, description, metadata, created_at, billing_country
+    balance_transaction_id, customer_id, description, metadata, created_at, billing_country,
+    fortnox_invoice_number
 FROM stripe_charges WHERE id = ? LIMIT 1`
 	row := q.db.QueryRowContext(ctx, query, id)
 	c := &StripeCharge{}
 	err := row.Scan(&c.ID, &c.PaymentIntentID, &c.Amount, &c.AmountCaptured, &c.Currency,
 		&c.Status, &c.BalanceTransactionID, &c.CustomerID, &c.Description, &c.Metadata, &c.CreatedAt,
-		&c.BillingCountry)
+		&c.BillingCountry, &c.FortnoxInvoiceNumber)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -180,12 +261,12 @@ FROM stripe_charges WHERE id = ? LIMIT 1`
 
 func (q *Queries) ListUnsyncedCharges(ctx context.Context) ([]StripeCharge, error) {
 	const query = `
-SELECT sc.id, sc.payment_intent_id, sc.amount, sc.amount_captured, sc.currency, sc.status,
-    sc.balance_transaction_id, sc.customer_id, sc.description, sc.metadata, sc.created_at, sc.billing_country
-FROM stripe_charges sc
-LEFT JOIN fortnox_vouchers fv ON fv.source_type = 'charge' AND fv.source_id = sc.id
-WHERE sc.status = 'succeeded' AND fv.id IS NULL
-ORDER BY sc.created_at ASC`
+SELECT id, payment_intent_id, amount, amount_captured, currency, status,
+    balance_transaction_id, customer_id, description, metadata, created_at, billing_country,
+    fortnox_invoice_number
+FROM stripe_charges
+WHERE status = 'succeeded' AND fortnox_invoice_number IS NULL
+ORDER BY created_at ASC`
 	rows, err := q.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -196,7 +277,7 @@ ORDER BY sc.created_at ASC`
 		c := StripeCharge{}
 		if err := rows.Scan(&c.ID, &c.PaymentIntentID, &c.Amount, &c.AmountCaptured, &c.Currency,
 			&c.Status, &c.BalanceTransactionID, &c.CustomerID, &c.Description, &c.Metadata, &c.CreatedAt,
-			&c.BillingCountry); err != nil {
+			&c.BillingCountry, &c.FortnoxInvoiceNumber); err != nil {
 			return nil, err
 		}
 		charges = append(charges, c)
@@ -205,13 +286,9 @@ ORDER BY sc.created_at ASC`
 }
 
 func (q *Queries) CountUnsyncedCharges(ctx context.Context) (int64, error) {
-	const query = `
-SELECT COUNT(*)
-FROM stripe_charges sc
-LEFT JOIN fortnox_vouchers fv ON fv.source_type = 'charge' AND fv.source_id = sc.id
-WHERE sc.status = 'succeeded' AND fv.id IS NULL`
 	var count int64
-	err := q.db.QueryRowContext(ctx, query).Scan(&count)
+	err := q.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM stripe_charges WHERE status = 'succeeded' AND fortnox_invoice_number IS NULL`).Scan(&count)
 	return count, err
 }
 

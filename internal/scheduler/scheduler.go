@@ -18,13 +18,20 @@ type Scheduler struct {
 	queries        *db.Queries
 	stripeSyncer   *stripesync.Syncer
 	voucherCreator *fortnox.VoucherCreator
+	invoiceService *fortnox.InvoiceService
 }
 
-func New(queries *db.Queries, stripeSyncer *stripesync.Syncer, voucherCreator *fortnox.VoucherCreator) *Scheduler {
+func New(
+	queries *db.Queries,
+	stripeSyncer *stripesync.Syncer,
+	voucherCreator *fortnox.VoucherCreator,
+	invoiceService *fortnox.InvoiceService,
+) *Scheduler {
 	return &Scheduler{
 		queries:        queries,
 		stripeSyncer:   stripeSyncer,
 		voucherCreator: voucherCreator,
+		invoiceService: invoiceService,
 	}
 }
 
@@ -65,41 +72,89 @@ func (s *Scheduler) syncAll(ctx context.Context) {
 		log.Printf("scheduler: stripe sync error: %v", err)
 	}
 
+	// Sync charges → Fortnox invoices.
 	charges, err := s.queries.ListUnsyncedCharges(ctx)
 	if err != nil {
 		log.Printf("scheduler: list unsynced charges: %v", err)
-		return
 	}
 	for _, charge := range charges {
-		country := ""
-		if charge.BillingCountry.Valid {
-			country = charge.BillingCountry.String
-		}
-		v, err := s.voucherCreator.CreateChargeVoucher(ctx, charge, country)
+		customer, _ := fetchCustomer(ctx, s.queries, charge.CustomerID.String)
+		invoiceNum, err := s.invoiceService.CreateInvoice(ctx, charge, customer)
 		if err != nil {
-			log.Printf("scheduler: create charge voucher %s: %v", charge.ID, err)
+			log.Printf("scheduler: create invoice for charge %s: %v", charge.ID, err)
 			s.queries.InsertSyncLog(ctx, "charges", charge.ID, "fortnox_error", err.Error())
 			continue
 		}
-		log.Printf("scheduler: created voucher %d for charge %s", v.ID, charge.ID)
-		s.queries.InsertSyncLog(ctx, "charges", charge.ID, "fortnox_synced", "")
+		log.Printf("scheduler: created fortnox invoice %s for charge %s", invoiceNum, charge.ID)
+		s.queries.InsertSyncLog(ctx, "charges", charge.ID, "fortnox_invoice_created", invoiceNum)
 	}
 
+	// Sync payouts → invoicepayments + fee vouchers + payout vouchers.
 	payouts, err := s.queries.ListUnsyncedPayouts(ctx)
 	if err != nil {
 		log.Printf("scheduler: list unsynced payouts: %v", err)
-		return
 	}
 	for _, payout := range payouts {
+		payoutDate := time.Unix(payout.ArrivalDate, 0)
+
+		txns, err := s.queries.ListBalanceTransactionsForPayout(ctx, payout.ID)
+		if err != nil {
+			log.Printf("scheduler: list balance txns for payout %s: %v", payout.ID, err)
+			s.queries.InsertSyncLog(ctx, "payouts", payout.ID, "fortnox_error", err.Error())
+			continue
+		}
+
+		for _, txn := range txns {
+			if txn.Type != "charge" || !txn.SourceID.Valid {
+				continue
+			}
+			chargeID := txn.SourceID.String
+
+			charge, err := s.queries.GetStripeCharge(ctx, chargeID)
+			if err != nil || charge == nil {
+				log.Printf("scheduler: get charge %s: %v", chargeID, err)
+				continue
+			}
+
+			if charge.FortnoxInvoiceNumber.Valid &&
+				charge.FortnoxInvoiceNumber.String != "" &&
+				charge.FortnoxInvoiceNumber.String != "LEGACY" {
+				if err := s.invoiceService.MarkInvoicePaid(ctx, charge.FortnoxInvoiceNumber.String, charge.Amount, payoutDate); err != nil {
+					log.Printf("scheduler: mark invoice paid %s: %v", charge.FortnoxInvoiceNumber.String, err)
+				}
+			}
+
+			if txn.Fee > 0 {
+				txnDate := time.Unix(txn.CreatedAt, 0)
+				if _, err := s.voucherCreator.CreateFeeVoucher(ctx, chargeID, txn.Fee, txnDate); err != nil {
+					log.Printf("scheduler: create fee voucher for charge %s: %v", chargeID, err)
+				}
+			}
+		}
+
 		v, err := s.voucherCreator.CreatePayoutVoucher(ctx, payout)
 		if err != nil {
 			log.Printf("scheduler: create payout voucher %s: %v", payout.ID, err)
 			s.queries.InsertSyncLog(ctx, "payouts", payout.ID, "fortnox_error", err.Error())
 			continue
 		}
-		log.Printf("scheduler: created voucher %d for payout %s", v.ID, payout.ID)
+		log.Printf("scheduler: created payout voucher %d for payout %s", v.ID, payout.ID)
 		s.queries.InsertSyncLog(ctx, "payouts", payout.ID, "fortnox_synced", "")
 	}
 
 	log.Printf("scheduler: auto-sync complete")
+}
+
+func fetchCustomer(ctx context.Context, queries *db.Queries, customerID string) (*db.StripeCustomer, error) {
+	if customerID == "" {
+		return &db.StripeCustomer{ID: ""}, nil
+	}
+	c, err := queries.GetStripeCustomer(ctx, customerID)
+	if err != nil {
+		return &db.StripeCustomer{ID: customerID}, err
+	}
+	if c == nil {
+		return &db.StripeCustomer{ID: customerID}, nil
+	}
+	return c, nil
 }

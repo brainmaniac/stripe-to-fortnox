@@ -1,27 +1,22 @@
 package views
 
+type AccountMappingView struct {
+	ID       int64
+	Kontotyp string
+	Matchtyp string
+	Matchkod string
+	Konto    string
+	Momssats string // empty string if NULL
+}
+
 type SettingsData struct {
 	FortnoxConnected    bool
 	FortnoxClientID     string
 	StripeKeySet        bool
 	FlashKind           string
 	FlashMsg            string
-	AccountConfig       AccountConfigForm
+	AccountMappings     []AccountMappingView
 	SyncIntervalMinutes string
-}
-
-type AccountConfigForm struct {
-	StripeClearing   string
-	BankAccount      string
-	RevenueSE        string
-	RevenueEU        string
-	RevenueWO        string
-	OutputVAT25      string
-	PaymentFee       string
-	ReverseVATDebit  string
-	ReverseVATCredit string
-	VoucherSeries    string
-	VATPercent       string
 }
 
 templ Settings(d SettingsData) {
@@ -47,92 +42,34 @@ templ Settings(d SettingsData) {
 			}
 		</section>
 		<section class="section">
-			<h2>Kontoinställningar</h2>
-			<p class="text-muted" style="margin-bottom:1rem">Dessa konton används vid skapande av verifikationer i Fortnox.</p>
-			<form method="POST" action="/settings/accounts">
-				<table class="table" style="max-width:700px">
-					<thead>
+			<h2>Kontomappning</h2>
+			<p class="text-muted" style="margin-bottom:1rem">Konton som används vid bokföring i Fortnox. Ändra konto och momssats per rad och spara.</p>
+			<table class="table" style="max-width:800px">
+				<thead>
+					<tr>
+						<th>Kontotyp</th>
+						<th>Matchtyp</th>
+						<th>Matchkod</th>
+						<th>Konto</th>
+						<th>Momssats %</th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, m := range d.AccountMappings {
 						<tr>
-							<th>Beskrivning</th>
-							<th>Konto</th>
+							<form method="POST" action={ templ.SafeURL("/settings/accounts/" + itoa(m.ID)) }>
+								<td>{ m.Kontotyp }</td>
+								<td>{ m.Matchtyp }</td>
+								<td>{ m.Matchkod }</td>
+								<td><input type="text" name="konto" class="form-control" value={ m.Konto } style="max-width:90px" required/></td>
+								<td><input type="text" name="momssats" class="form-control" value={ m.Momssats } style="max-width:80px" placeholder="–"/></td>
+								<td><button type="submit" class="btn btn-sm btn-primary">Spara</button></td>
+							</form>
 						</tr>
-					</thead>
-					<tbody>
-						<tr>
-							<td>
-								<strong>Avstämningskonto Stripe</strong><br/>
-								<small class="text-muted">Debiteras vid betalning, krediteras vid utbetalning/avgift</small>
-							</td>
-							<td><input type="text" name="stripe_clearing" class="form-control" value={ d.AccountConfig.StripeClearing } placeholder="1521" style="max-width:100px"/></td>
-						</tr>
-						<tr>
-							<td>
-								<strong>Utbetalningskonto bank</strong><br/>
-								<small class="text-muted">Debiteras när Stripe betalar ut till bankkonto</small>
-							</td>
-							<td><input type="text" name="bank_account" class="form-control" value={ d.AccountConfig.BankAccount } placeholder="1930" style="max-width:100px"/></td>
-						</tr>
-						<tr>
-							<td>
-								<strong>Intäktskonto Sverige (SE)</strong><br/>
-								<small class="text-muted">Krediteras vid betalning från svensk kund</small>
-							</td>
-							<td><input type="text" name="revenue_se" class="form-control" value={ d.AccountConfig.RevenueSE } placeholder="3010" style="max-width:100px"/></td>
-						</tr>
-						<tr>
-							<td>
-								<strong>Intäktskonto EU</strong><br/>
-								<small class="text-muted">Krediteras vid betalning från EU-kund (ej Sverige)</small>
-							</td>
-							<td><input type="text" name="revenue_eu" class="form-control" value={ d.AccountConfig.RevenueEU } placeholder="3007" style="max-width:100px"/></td>
-						</tr>
-						<tr>
-							<td>
-								<strong>Intäktskonto utanför EU (WO)</strong><br/>
-								<small class="text-muted">Krediteras vid betalning från kund utanför EU</small>
-							</td>
-							<td><input type="text" name="revenue_wo" class="form-control" value={ d.AccountConfig.RevenueWO } placeholder="3008" style="max-width:100px"/></td>
-						</tr>
-						<tr>
-							<td>
-								<strong>Utgående moms 25%</strong><br/>
-								<small class="text-muted">Krediteras med momsdelen vid svenska försäljningar</small>
-							</td>
-							<td><input type="text" name="output_vat25" class="form-control" value={ d.AccountConfig.OutputVAT25 } placeholder="2611" style="max-width:100px"/></td>
-						</tr>
-						<tr>
-							<td>
-								<strong>Konto betalväxelavgift</strong><br/>
-								<small class="text-muted">Debiteras med Stripe-avgiftens nettobelopp</small>
-							</td>
-							<td><input type="text" name="payment_fee" class="form-control" value={ d.AccountConfig.PaymentFee } placeholder="6065" style="max-width:100px"/></td>
-						</tr>
-						<tr>
-							<td>
-								<strong>Omvänd moms betalväxelavgift – debet</strong><br/>
-								<small class="text-muted">Ingående moms vid omvänd skattskyldighet (Stripe/Irland)</small>
-							</td>
-							<td><input type="text" name="reverse_vat_debit" class="form-control" value={ d.AccountConfig.ReverseVATDebit } placeholder="2645" style="max-width:100px"/></td>
-						</tr>
-						<tr>
-							<td>
-								<strong>Omvänd moms betalväxelavgift – kredit</strong><br/>
-								<small class="text-muted">Utgående moms vid omvänd skattskyldighet (Stripe/Irland)</small>
-							</td>
-							<td><input type="text" name="reverse_vat_credit" class="form-control" value={ d.AccountConfig.ReverseVATCredit } placeholder="2614" style="max-width:100px"/></td>
-						</tr>
-					</tbody>
-				</table>
-				<div class="form-group" style="margin-top:1rem">
-					<label>Verifikationsserie (standard: A)</label>
-					<input type="text" name="voucher_series" class="form-control" value={ d.AccountConfig.VoucherSeries } placeholder="A"/>
-				</div>
-				<div class="form-group">
-					<label>Momssats % (standard: 25)</label>
-					<input type="text" name="vat_percent" class="form-control" value={ d.AccountConfig.VATPercent } placeholder="25"/>
-				</div>
-				<button type="submit" class="btn btn-primary">Spara kontoinställningar</button>
-			</form>
+					}
+				</tbody>
+			</table>
 		</section>
 		<section class="section">
 			<h2>Automatisk synkronisering</h2>
@@ -146,4 +83,23 @@ templ Settings(d SettingsData) {
 			</form>
 		</section>
 	}
+}
+
+func itoa(n int64) string {
+	s := ""
+	if n == 0 {
+		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	for n > 0 {
+		s = string(rune('0'+n%10)) + s
+		n /= 10
+	}
+	if neg {
+		s = "-" + s
+	}
+	return s
 }
