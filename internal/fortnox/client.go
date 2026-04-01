@@ -89,6 +89,18 @@ func (c *APIClient) Post(ctx context.Context, path string, body interface{}) ([]
 	return nil, lastErr
 }
 
+// Put sends a PUT request to the Fortnox API.
+func (c *APIClient) Put(ctx context.Context, path string, body interface{}) ([]byte, error) {
+	respBody, statusCode, err := c.do(ctx, http.MethodPut, path, body)
+	if err != nil {
+		return nil, err
+	}
+	if statusCode >= 400 {
+		return nil, fmt.Errorf("fortnox api error %d: %s", statusCode, string(respBody))
+	}
+	return respBody, nil
+}
+
 // Get sends a GET request to the Fortnox API.
 func (c *APIClient) Get(ctx context.Context, path string) ([]byte, error) {
 	respBody, statusCode, err := c.do(ctx, http.MethodGet, path, nil)

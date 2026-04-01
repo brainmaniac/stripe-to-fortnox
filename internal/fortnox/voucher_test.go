@@ -33,6 +33,10 @@ func (m *mockPoster) Post(_ context.Context, _ string, _ interface{}) ([]byte, e
 	return b, nil
 }
 
+func (m *mockPoster) Put(_ context.Context, _ string, _ interface{}) ([]byte, error) {
+	return []byte("{}"), nil
+}
+
 func newCreator(t *testing.T, poster *mockPoster) (*VoucherCreator, *db.Queries) {
 	t.Helper()
 	q := testutil.NewTestDB(t)

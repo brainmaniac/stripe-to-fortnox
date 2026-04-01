@@ -106,9 +106,10 @@ type VoucherResponse struct {
 	} `json:"Voucher"`
 }
 
-// Poster is the subset of APIClient used by VoucherCreator (enables testing without a real HTTP client).
+// Poster is the subset of APIClient used by VoucherCreator and InvoiceService (enables testing without a real HTTP client).
 type Poster interface {
 	Post(ctx context.Context, path string, body interface{}) ([]byte, error)
+	Put(ctx context.Context, path string, body interface{}) ([]byte, error)
 }
 
 // VoucherCreator creates Fortnox vouchers from Stripe events.

@@ -37,10 +37,11 @@ type fortnoxCustomerResponse struct {
 }
 
 type fortnoxInvoiceRow struct {
-	AccountNumber int     `json:"AccountNumber"`
-	Description   string  `json:"Description"`
-	Price         float64 `json:"Price"`
-	VAT           int     `json:"VAT"`
+	AccountNumber     int     `json:"AccountNumber"`
+	Description       string  `json:"Description"`
+	Price             float64 `json:"Price"`
+	VAT               int     `json:"VAT"`
+	DeliveredQuantity float64 `json:"DeliveredQuantity"`
 }
 
 type fortnoxInvoiceRequest struct {
@@ -157,10 +158,11 @@ func (s *InvoiceService) CreateInvoice(ctx context.Context, charge db.StripeChar
 	req.Invoice.Comments = "Stripe " + charge.ID
 	req.Invoice.InvoiceRows = []fortnoxInvoiceRow{
 		{
-			AccountNumber: accountNum,
-			Description:   charge.ID,
-			Price:         priceExclVAT,
-			VAT:           int(vatRate),
+			AccountNumber:     accountNum,
+			Description:       charge.ID,
+			Price:             priceExclVAT,
+			VAT:               int(vatRate),
+			DeliveredQuantity: 1,
 		},
 	}
 
@@ -177,11 +179,18 @@ func (s *InvoiceService) CreateInvoice(ctx context.Context, charge db.StripeChar
 		return "", fmt.Errorf("fortnox returned empty invoice number")
 	}
 
-	if err := s.queries.SetChargeFortnoxInvoiceNumber(ctx, charge.ID, resp.Invoice.DocumentNumber); err != nil {
+	invoiceNum := resp.Invoice.DocumentNumber
+
+	// Book the invoice immediately so Fortnox creates the B-series accounting voucher.
+	if _, err := s.api.Put(ctx, "invoices/"+invoiceNum+"/bookkeep", nil); err != nil {
+		return "", fmt.Errorf("bookkeep fortnox invoice: %w", err)
+	}
+
+	if err := s.queries.SetChargeFortnoxInvoiceNumber(ctx, charge.ID, invoiceNum); err != nil {
 		return "", fmt.Errorf("save invoice number: %w", err)
 	}
 
-	return resp.Invoice.DocumentNumber, nil
+	return invoiceNum, nil
 }
 
 // MarkInvoicePaid records an invoice payment in Fortnox, crediting the Stripe clearing account (1521).
