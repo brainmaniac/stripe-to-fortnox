@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"time"
 	"stripe-fortnox-sync/internal/db"
 )
 
@@ -37,8 +38,8 @@ templ Payouts(d PayoutsData) {
 							<td>{ fmt.Sprintf("%.2f", float64(p.Amount)/100) }</td>
 							<td>{ p.Currency }</td>
 							<td>{ p.Status }</td>
-							<td>{ fmt.Sprintf("%d", p.ArrivalDate) }</td>
-							<td>{ fmt.Sprintf("%d", p.CreatedAt) }</td>
+							<td>{ time.Unix(p.ArrivalDate, 0).Format("2006-01-02") }</td>
+							<td>{ time.Unix(p.CreatedAt, 0).Format("2006-01-02 15:04") }</td>
 						</tr>
 					}
 				</tbody>

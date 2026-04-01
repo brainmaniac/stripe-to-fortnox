@@ -36,13 +36,17 @@ func NewSyncHandler(
 	}
 }
 
-// TriggerStripeSync starts a full Stripe data pull in the background and redirects.
+// TriggerStripeSync starts a full Stripe data pull in the background.
 func (h *SyncHandler) TriggerStripeSync(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		if err := h.stripeSyncer.SyncAll(context.Background()); err != nil {
 			log.Printf("stripe sync error: %v", err)
 		}
 	}()
+	if r.Header.Get("HX-Request") == "true" {
+		h.renderSyncStatus(w, r, "sync_started")
+		return
+	}
 	http.Redirect(w, r, "/sync?flash=sync_started", http.StatusSeeOther)
 }
 
@@ -54,7 +58,36 @@ func (h *SyncHandler) TriggerFortnoxSync(w http.ResponseWriter, r *http.Request)
 		syncChargesToFortnox(ctx, h.queries, h.invoiceService)
 		syncPayoutsToFortnox(ctx, h.queries, h.invoiceService, h.voucherCreator)
 	}()
+	if r.Header.Get("HX-Request") == "true" {
+		h.renderSyncStatus(w, r, "fortnox_sync_started")
+		return
+	}
 	http.Redirect(w, r, "/sync?flash=fortnox_sync_started", http.StatusSeeOther)
+}
+
+// SyncStatus returns just the live status section (used by HTMX polling).
+func (h *SyncHandler) SyncStatus(w http.ResponseWriter, r *http.Request) {
+	h.renderSyncStatus(w, r, "")
+}
+
+func (h *SyncHandler) renderSyncStatus(w http.ResponseWriter, r *http.Request, flash string) {
+	ctx := r.Context()
+	states, _ := h.queries.ListSyncStates(ctx)
+	unsyncedChargeList, _ := h.queries.ListUnsyncedCharges(ctx)
+	unsyncedPayoutList, _ := h.queries.ListUnsyncedPayouts(ctx)
+	pendingVouchers, _ := h.queries.ListPendingFortnoxVouchers(ctx)
+	data := views.SyncPageData{
+		SyncStates:         states,
+		UnsyncedCharges:    int64(len(unsyncedChargeList)),
+		UnsyncedPayouts:    int64(len(unsyncedPayoutList)),
+		UnsyncedChargeList: unsyncedChargeList,
+		UnsyncedPayoutList: unsyncedPayoutList,
+		PendingVouchers:    pendingVouchers,
+		Flash:              flash,
+	}
+	if err := views.SyncStatusSection(data).Render(ctx, w); err != nil {
+		log.Printf("render sync status: %v", err)
+	}
 }
 
 // syncChargesToFortnox creates a Fortnox invoice for each unsynced Stripe charge.
@@ -173,20 +206,13 @@ func fetchOrPlaceholderCustomer(ctx context.Context, queries *db.Queries, custom
 	return c, nil
 }
 
-// SyncPage renders a page with sync status and controls.
+// SyncPage renders the full sync page (initial load).
 func (h *SyncHandler) SyncPage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-
-	states, err := h.queries.ListSyncStates(ctx)
-	if err != nil {
-		log.Printf("list sync states: %v", err)
-	}
-
+	states, _ := h.queries.ListSyncStates(ctx)
 	unsyncedChargeList, _ := h.queries.ListUnsyncedCharges(ctx)
 	unsyncedPayoutList, _ := h.queries.ListUnsyncedPayouts(ctx)
 	pendingVouchers, _ := h.queries.ListPendingFortnoxVouchers(ctx)
-
-	flash := r.URL.Query().Get("flash")
 	data := views.SyncPageData{
 		SyncStates:         states,
 		UnsyncedCharges:    int64(len(unsyncedChargeList)),
@@ -194,7 +220,7 @@ func (h *SyncHandler) SyncPage(w http.ResponseWriter, r *http.Request) {
 		UnsyncedChargeList: unsyncedChargeList,
 		UnsyncedPayoutList: unsyncedPayoutList,
 		PendingVouchers:    pendingVouchers,
-		Flash:              flash,
+		Flash:              r.URL.Query().Get("flash"),
 	}
 	if err := views.SyncPage(data).Render(ctx, w); err != nil {
 		log.Printf("render sync page: %v", err)
@@ -258,6 +284,10 @@ func (h *SyncHandler) RetryPendingVoucher(w http.ResponseWriter, r *http.Request
 		}
 	}()
 
+	if r.Header.Get("HX-Request") == "true" {
+		h.renderSyncStatus(w, r, "retry_started")
+		return
+	}
 	http.Redirect(w, r, "/sync?flash=retry_started", http.StatusSeeOther)
 }
 

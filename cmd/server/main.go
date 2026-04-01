@@ -101,6 +101,7 @@ func main() {
 		r.Post("/sync/stripe", syncHandler.TriggerStripeSync)
 		r.Post("/sync/fortnox", syncHandler.TriggerFortnoxSync)
 		r.Post("/sync/fortnox/retry/{id}", syncHandler.RetryPendingVoucher)
+		r.Get("/sync/status", syncHandler.SyncStatus)
 		r.Get("/sync", syncHandler.SyncPage)
 		r.Get("/vouchers", syncHandler.ListVouchers)
 		r.Get("/customers", syncHandler.ListCustomers)

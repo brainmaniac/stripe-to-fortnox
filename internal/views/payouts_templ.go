@@ -11,6 +11,7 @@ import templruntime "github.com/a-h/templ/runtime"
 import (
 	"fmt"
 	"stripe-fortnox-sync/internal/db"
+	"time"
 )
 
 type PayoutsData struct {
@@ -60,7 +61,7 @@ func Payouts(d PayoutsData) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("Totalt: %d utbetalningar", d.Total))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 18, Col: 74}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 19, Col: 74}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -88,7 +89,7 @@ func Payouts(d PayoutsData) templ.Component {
 					var templ_7745c5c3_Var4 string
 					templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(p.ID)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 36, Col: 23}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 37, Col: 23}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 					if templ_7745c5c3_Err != nil {
@@ -101,7 +102,7 @@ func Payouts(d PayoutsData) templ.Component {
 					var templ_7745c5c3_Var5 string
 					templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%.2f", float64(p.Amount)/100))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 37, Col: 55}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 38, Col: 55}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 					if templ_7745c5c3_Err != nil {
@@ -114,7 +115,7 @@ func Payouts(d PayoutsData) templ.Component {
 					var templ_7745c5c3_Var6 string
 					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(p.Currency)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 38, Col: 23}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 39, Col: 23}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 					if templ_7745c5c3_Err != nil {
@@ -127,7 +128,7 @@ func Payouts(d PayoutsData) templ.Component {
 					var templ_7745c5c3_Var7 string
 					templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(p.Status)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 39, Col: 21}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 40, Col: 21}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 					if templ_7745c5c3_Err != nil {
@@ -138,9 +139,9 @@ func Payouts(d PayoutsData) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var8 string
-					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", p.ArrivalDate))
+					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(time.Unix(p.ArrivalDate, 0).Format("2006-01-02"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 40, Col: 45}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 41, Col: 61}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 					if templ_7745c5c3_Err != nil {
@@ -151,9 +152,9 @@ func Payouts(d PayoutsData) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var9 string
-					templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", p.CreatedAt))
+					templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(time.Unix(p.CreatedAt, 0).Format("2006-01-02 15:04"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 41, Col: 43}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 42, Col: 65}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 					if templ_7745c5c3_Err != nil {
@@ -216,7 +217,7 @@ func payoutPagination(d PayoutsData) templ.Component {
 			var templ_7745c5c3_Var11 templ.SafeURL
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/payouts?page=%d", d.Page-1)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 54, Col: 69}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 55, Col: 69}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -239,7 +240,7 @@ func payoutPagination(d PayoutsData) templ.Component {
 			d.Total,
 		))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 62, Col: 4}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 63, Col: 4}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -257,7 +258,7 @@ func payoutPagination(d PayoutsData) templ.Component {
 			var templ_7745c5c3_Var13 templ.SafeURL
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/payouts?page=%d", d.Page+1)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 65, Col: 69}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/payouts.templ`, Line: 66, Col: 69}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
