@@ -106,7 +106,17 @@ newgrp docker                   # apply group change without logging out
 
 ### One-time server setup
 
-SSH into your VPS and run the setup wizard to create the `.env` file:
+SSH into your VPS and run the setup wizard to create the `.env` file and fix database permissions:
+
+```sh
+# Fix database permissions so the container can write to it
+sudo chown -R 1000:1000 /opt/stripe-to-fortnox/data
+sudo chmod 666 /opt/stripe-to-fortnox/data/app.db
+# Also fix the SQLite WAL files if they exist (SQLite write-ahead log — required for writes)
+sudo chmod 666 /opt/stripe-to-fortnox/data/app.db-shm /opt/stripe-to-fortnox/data/app.db-wal 2>/dev/null || true
+```
+
+
 
 ```sh
 git clone <your-repo-url> /opt/stripe-fortnox-sync

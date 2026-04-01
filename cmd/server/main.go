@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"stripe-fortnox-sync/internal/fortnox"
 	"stripe-fortnox-sync/internal/handler"
 	appmiddleware "stripe-fortnox-sync/internal/middleware"
+	"stripe-fortnox-sync/internal/scheduler"
 	stripepkg "stripe-fortnox-sync/internal/stripe"
 )
 
@@ -57,6 +59,10 @@ func main() {
 	fortnoxAPI := fortnox.NewAPIClient(fortnoxOAuth)
 	voucherCreator := fortnox.NewVoucherCreator(fortnoxAPI, queries, fortnox.DefaultAccountConfig())
 
+	// Scheduler
+	sched := scheduler.New(queries, stripeSyncer, voucherCreator)
+	sched.Start(context.Background())
+
 	// Handlers
 	authHandler := handler.NewAuthHandler(sessionManager, cfg.AdminPasswordHash)
 	dashboardHandler := handler.NewDashboardHandler(queries, fortnoxOAuth)
@@ -85,6 +91,7 @@ func main() {
 		r.Post("/logout", authHandler.Logout)
 		r.Get("/settings", settingsHandler.Settings)
 		r.Post("/settings/accounts", settingsHandler.SaveAccountSettings)
+		r.Post("/settings/sync-interval", settingsHandler.SaveSyncInterval)
 		r.Post("/settings/fortnox/disconnect", settingsHandler.FortnoxDisconnect)
 		r.Get("/auth/fortnox", settingsHandler.FortnoxAuthorize)
 		r.Post("/sync/stripe", syncHandler.TriggerStripeSync)

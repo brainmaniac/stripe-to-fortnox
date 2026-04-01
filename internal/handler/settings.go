@@ -44,7 +44,8 @@ func (h *SettingsHandler) Settings(w http.ResponseWriter, r *http.Request) {
 		FortnoxConnected: h.fortnoxOAuth.IsConnected(ctx),
 		FortnoxClientID:  h.cfg.FortnoxClientID,
 		StripeKeySet:     h.cfg.StripeAPIKey != "",
-		AccountConfig:    h.loadAccountConfig(ctx),
+		AccountConfig:       h.loadAccountConfig(ctx),
+		SyncIntervalMinutes: h.loadSyncInterval(ctx),
 	}
 	if err := views.Settings(data).Render(ctx, w); err != nil {
 		log.Printf("render settings: %v", err)
@@ -142,7 +143,8 @@ func (h *SettingsHandler) renderSettings(w http.ResponseWriter, r *http.Request,
 		StripeKeySet:     h.cfg.StripeAPIKey != "",
 		FlashKind:        flashKind,
 		FlashMsg:         flashMsg,
-		AccountConfig:    h.loadAccountConfig(ctx),
+		AccountConfig:       h.loadAccountConfig(ctx),
+		SyncIntervalMinutes: h.loadSyncInterval(ctx),
 	}
 	views.Settings(data).Render(ctx, w)
 }
@@ -168,6 +170,32 @@ func (h *SettingsHandler) loadAccountConfig(ctx context.Context) views.AccountCo
 		VoucherSeries:    get("voucher_series", "A"),
 		VATPercent:       get("vat_percent", strconv.FormatFloat(25.0, 'f', -1, 64)),
 	}
+}
+
+func (h *SettingsHandler) loadSyncInterval(ctx context.Context) string {
+	s, err := h.queries.GetSetting(ctx, "sync_interval_minutes")
+	if err != nil || s == nil {
+		return "60"
+	}
+	return s.Value
+}
+
+func (h *SettingsHandler) SaveSyncInterval(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	val := r.FormValue("sync_interval_minutes")
+	if val == "" {
+		val = "60"
+	}
+	if err := h.queries.UpsertSetting(ctx, "sync_interval_minutes", val, 0); err != nil {
+		log.Printf("save sync interval: %v", err)
+		h.renderSettings(w, r, "danger", "Kunde inte spara intervall: "+err.Error())
+		return
+	}
+	h.renderSettings(w, r, "success", "Synkintervall sparat.")
 }
 
 func randomHex(n int) string {
