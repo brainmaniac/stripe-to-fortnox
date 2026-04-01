@@ -96,6 +96,7 @@ func main() {
 		r.Post("/settings/accounts", settingsHandler.CreateMapping)
 		r.Post("/settings/accounts/{id}", settingsHandler.UpdateMapping)
 		r.Post("/settings/sync-interval", settingsHandler.SaveSyncInterval)
+		r.Post("/settings/sync-from-date", settingsHandler.SaveSyncFromDate)
 		r.Post("/settings/fortnox/disconnect", settingsHandler.FortnoxDisconnect)
 		r.Get("/auth/fortnox", settingsHandler.FortnoxAuthorize)
 		r.Post("/sync/stripe", syncHandler.TriggerStripeSync)

@@ -13,6 +13,18 @@ import (
 	"stripe-fortnox-sync/internal/db"
 )
 
+// syncFromTimestamp returns the configured charges_sync_from_date as a Unix timestamp,
+// falling back to the start of the current year if no setting is stored.
+func (s *Syncer) syncFromTimestamp(ctx context.Context) int64 {
+	setting, err := s.queries.GetSetting(ctx, "charges_sync_from_date")
+	if err == nil && setting != nil && setting.Value != "" {
+		if t, err := time.Parse("2006-01-02", setting.Value); err == nil {
+			return t.UTC().Unix()
+		}
+	}
+	return startOfYear()
+}
+
 // startOfYear returns the Unix timestamp for Jan 1 of the current year (UTC).
 func startOfYear() int64 {
 	now := time.Now().UTC()
@@ -108,7 +120,7 @@ func (s *Syncer) SyncCharges(ctx context.Context) error {
 	if maxAt > 0 {
 		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(maxAt-10, 10))
 	} else {
-		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(startOfYear(), 10))
+		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(s.syncFromTimestamp(ctx), 10))
 	}
 
 	iter := s.api.Charges.List(params)
@@ -145,7 +157,7 @@ func (s *Syncer) SyncPayouts(ctx context.Context) error {
 	if maxAt > 0 {
 		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(maxAt-10, 10))
 	} else {
-		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(startOfYear(), 10))
+		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(s.syncFromTimestamp(ctx), 10))
 	}
 
 	iter := s.api.Payouts.List(params)

@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -48,6 +49,7 @@ func (h *SettingsHandler) Settings(w http.ResponseWriter, r *http.Request) {
 		StripeKeySet:        h.cfg.StripeAPIKey != "",
 		AccountMappings:     h.loadAccountMappings(ctx),
 		SyncIntervalMinutes: h.loadSyncInterval(ctx),
+		SyncFromDate:        h.loadSyncFromDate(ctx),
 	}
 	if err := views.Settings(data).Render(ctx, w); err != nil {
 		log.Printf("render settings: %v", err)
@@ -201,6 +203,7 @@ func (h *SettingsHandler) renderSettings(w http.ResponseWriter, r *http.Request,
 		FlashMsg:            flashMsg,
 		AccountMappings:     h.loadAccountMappings(ctx),
 		SyncIntervalMinutes: h.loadSyncInterval(ctx),
+		SyncFromDate:        h.loadSyncFromDate(ctx),
 	}
 	views.Settings(data).Render(ctx, w)
 }
@@ -235,6 +238,36 @@ func (h *SettingsHandler) loadSyncInterval(ctx context.Context) string {
 		return "60"
 	}
 	return s.Value
+}
+
+func (h *SettingsHandler) loadSyncFromDate(ctx context.Context) string {
+	s, err := h.queries.GetSetting(ctx, "charges_sync_from_date")
+	if err != nil || s == nil {
+		return ""
+	}
+	return s.Value
+}
+
+func (h *SettingsHandler) SaveSyncFromDate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	val := r.FormValue("sync_from_date")
+	// Validate format YYYY-MM-DD
+	if val != "" {
+		if _, err := time.Parse("2006-01-02", val); err != nil {
+			h.renderSettings(w, r, "danger", "Ogiltigt datumformat, använd ÅÅÅÅ-MM-DD.")
+			return
+		}
+	}
+	if err := h.queries.UpsertSetting(ctx, "charges_sync_from_date", val, 0); err != nil {
+		log.Printf("save sync from date: %v", err)
+		h.renderSettings(w, r, "danger", "Kunde inte spara: "+err.Error())
+		return
+	}
+	h.renderSettings(w, r, "success", "Startdatum sparat.")
 }
 
 func (h *SettingsHandler) SaveSyncInterval(w http.ResponseWriter, r *http.Request) {
