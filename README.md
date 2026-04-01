@@ -53,7 +53,7 @@ This section describes what the app actually does, end to end. Each bullet is co
 
 1. **Client ID and Client Secret** — You need to create an integration in the Fortnox developer portal:
    - Go to [developer.fortnox.se](https://developer.fortnox.se) and sign in
-   - Create a new app and request the scopes: `bookkeeping`, `invoice`, `customer`, `companyinformation`
+   - Create a new app and enable the following scopes: **Betalningar**, **Bokföring**, **Faktura**, **Företagsinformation**, **Kostnadsställe**, **Kund**, **Leverantör**, **Leverantörsfaktura**, **Utvecklar-API**
    - Copy the **Client ID** and **Client Secret**
 2. **Redirect URI** — Set the redirect URI in your Fortnox app to `https://your-domain/auth/fortnox/callback`. You'll connect the account after the app is running via the settings page.
 3. **Fiscal years** — Fortnox requires an open fiscal year (bokföringsår) to exist for any date you want to create vouchers for. Make sure your fiscal years are set up in Fortnox under **Inställningar → Bokföringsår** before syncing historical data.
