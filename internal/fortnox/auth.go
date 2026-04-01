@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -142,6 +143,29 @@ func (o *OAuthClient) GetValidAccessToken(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("save refreshed tokens: %w", err)
 	}
 	return tr.AccessToken, nil
+}
+
+// StartTokenRefresher launches a background goroutine that proactively refreshes
+// the Fortnox access token every 50 minutes. This keeps the refresh token alive
+// (Fortnox refresh tokens expire after 30 days of non-use) even when there is
+// nothing to sync.
+func (o *OAuthClient) StartTokenRefresher(ctx context.Context) {
+	go func() {
+		ticker := time.NewTicker(50 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if _, err := o.GetValidAccessToken(ctx); err != nil {
+					log.Printf("fortnox token refresh: %v", err)
+				} else {
+					log.Printf("fortnox token refreshed proactively")
+				}
+			}
+		}
+	}()
 }
 
 // IsConnected returns true if Fortnox tokens are stored.

@@ -56,6 +56,7 @@ func main() {
 
 	// Fortnox
 	fortnoxOAuth := fortnox.NewOAuthClient(cfg.FortnoxClientID, cfg.FortnoxClientSecret, cfg.BaseURL, queries)
+	fortnoxOAuth.StartTokenRefresher(context.Background())
 	fortnoxAPI := fortnox.NewAPIClient(fortnoxOAuth)
 	voucherCreator := fortnox.NewVoucherCreator(fortnoxAPI, queries, fortnox.DefaultAccountConfig())
 	mappingResolver := fortnox.NewMappingResolver(queries)
