@@ -55,7 +55,7 @@ func (h *SyncHandler) TriggerStripeSync(w http.ResponseWriter, r *http.Request) 
 func (h *SyncHandler) TriggerFortnoxSync(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		ctx := context.Background()
-		syncChargesToFortnox(ctx, h.queries, h.invoiceService)
+		syncChargesToFortnox(ctx, h.queries, h.stripeSyncer, h.invoiceService)
 		syncPayoutsToFortnox(ctx, h.queries, h.invoiceService, h.voucherCreator)
 	}()
 	if r.Header.Get("HX-Request") == "true" {
@@ -91,14 +91,14 @@ func (h *SyncHandler) renderSyncStatus(w http.ResponseWriter, r *http.Request, f
 }
 
 // syncChargesToFortnox creates a Fortnox invoice for each unsynced Stripe charge.
-func syncChargesToFortnox(ctx context.Context, queries *db.Queries, invoiceService *fortnox.InvoiceService) {
+func syncChargesToFortnox(ctx context.Context, queries *db.Queries, stripeSyncer *stripesync.Syncer, invoiceService *fortnox.InvoiceService) {
 	charges, err := queries.ListUnsyncedCharges(ctx)
 	if err != nil {
 		log.Printf("list unsynced charges: %v", err)
 		return
 	}
 	for _, charge := range charges {
-		customer, err := fetchOrPlaceholderCustomer(ctx, queries, charge.CustomerID.String)
+		customer, err := fetchOrPlaceholderCustomer(ctx, queries, stripeSyncer, charge.CustomerID.String)
 		if err != nil {
 			log.Printf("get customer for charge %s: %v", charge.ID, err)
 		}
@@ -191,8 +191,10 @@ func processPayout(
 	return nil
 }
 
-// fetchOrPlaceholderCustomer retrieves a customer from the DB, returning a placeholder if not found.
-func fetchOrPlaceholderCustomer(ctx context.Context, queries *db.Queries, customerID string) (*db.StripeCustomer, error) {
+// fetchOrPlaceholderCustomer retrieves a customer from the local DB.
+// If not found, it fetches the customer directly from Stripe and upserts it locally.
+// Falls back to a placeholder if the Stripe fetch also fails.
+func fetchOrPlaceholderCustomer(ctx context.Context, queries *db.Queries, stripeSyncer *stripesync.Syncer, customerID string) (*db.StripeCustomer, error) {
 	if customerID == "" {
 		return &db.StripeCustomer{ID: ""}, nil
 	}
@@ -201,7 +203,13 @@ func fetchOrPlaceholderCustomer(ctx context.Context, queries *db.Queries, custom
 		return &db.StripeCustomer{ID: customerID}, err
 	}
 	if c == nil {
-		return &db.StripeCustomer{ID: customerID}, nil
+		log.Printf("customer %s not in local DB, fetching from Stripe", customerID)
+		fetched, err := stripeSyncer.FetchAndUpsertCustomer(ctx, customerID)
+		if err != nil {
+			log.Printf("fetch customer %s from stripe: %v", customerID, err)
+			return &db.StripeCustomer{ID: customerID}, nil
+		}
+		return fetched, nil
 	}
 	return c, nil
 }

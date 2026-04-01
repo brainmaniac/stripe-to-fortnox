@@ -78,8 +78,8 @@ func (s *Syncer) SyncCustomers(ctx context.Context) error {
 		// Incremental: only fetch customers created since the last known one.
 		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(maxAt-10, 10))
 	} else {
-		// First run: cap to start of last year to avoid pulling all history.
-		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(startOfLastYear(), 10))
+		// First run: use the same configured start date as charges/payouts.
+		params.Filters.AddFilter("created[gte]", "", strconv.FormatInt(s.syncFromTimestamp(ctx), 10))
 	}
 
 	iter := s.api.Customers.List(params)
@@ -195,6 +195,23 @@ func (s *Syncer) SyncPayouts(ctx context.Context) error {
 	}
 	log.Printf("synced %d payouts", count)
 	return nil
+}
+
+// FetchAndUpsertCustomer fetches a single customer from Stripe by ID and upserts it locally.
+// Used as a fallback when a customer referenced by a charge is not in the local DB.
+func (s *Syncer) FetchAndUpsertCustomer(ctx context.Context, customerID string) (*db.StripeCustomer, error) {
+	c, err := s.api.Customers.Get(customerID, nil)
+	if err != nil {
+		return nil, fmt.Errorf("fetch customer %s from stripe: %w", customerID, err)
+	}
+	country := ""
+	if c.Address != nil {
+		country = c.Address.Country
+	}
+	if err := s.queries.UpsertStripeCustomer(ctx, c.ID, c.Email, c.Name, country, c.Created); err != nil {
+		return nil, fmt.Errorf("upsert customer %s: %w", customerID, err)
+	}
+	return s.queries.GetStripeCustomer(ctx, customerID)
 }
 
 // SyncBalanceTransactionsForPayout fetches all balance transactions for a payout.

@@ -78,7 +78,7 @@ func (s *Scheduler) syncAll(ctx context.Context) {
 		log.Printf("scheduler: list unsynced charges: %v", err)
 	}
 	for _, charge := range charges {
-		customer, _ := fetchCustomer(ctx, s.queries, charge.CustomerID.String)
+		customer, _ := s.fetchCustomer(ctx, charge.CustomerID.String)
 		invoiceNum, err := s.invoiceService.CreateInvoice(ctx, charge, customer)
 		if err != nil {
 			log.Printf("scheduler: create invoice for charge %s: %v", charge.ID, err)
@@ -145,16 +145,22 @@ func (s *Scheduler) syncAll(ctx context.Context) {
 	log.Printf("scheduler: auto-sync complete")
 }
 
-func fetchCustomer(ctx context.Context, queries *db.Queries, customerID string) (*db.StripeCustomer, error) {
+func (s *Scheduler) fetchCustomer(ctx context.Context, customerID string) (*db.StripeCustomer, error) {
 	if customerID == "" {
 		return &db.StripeCustomer{ID: ""}, nil
 	}
-	c, err := queries.GetStripeCustomer(ctx, customerID)
+	c, err := s.queries.GetStripeCustomer(ctx, customerID)
 	if err != nil {
 		return &db.StripeCustomer{ID: customerID}, err
 	}
 	if c == nil {
-		return &db.StripeCustomer{ID: customerID}, nil
+		log.Printf("scheduler: customer %s not in local DB, fetching from Stripe", customerID)
+		fetched, err := s.stripeSyncer.FetchAndUpsertCustomer(ctx, customerID)
+		if err != nil {
+			log.Printf("scheduler: fetch customer %s from stripe: %v", customerID, err)
+			return &db.StripeCustomer{ID: customerID}, nil
+		}
+		return fetched, nil
 	}
 	return c, nil
 }
