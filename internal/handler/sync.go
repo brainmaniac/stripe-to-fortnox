@@ -79,6 +79,7 @@ func (h *SyncHandler) renderSyncStatus(w http.ResponseWriter, r *http.Request, f
 	pendingVouchers, _ := h.queries.ListPendingFortnoxVouchers(ctx)
 	chargeCount, _ := h.queries.CountStripeCharges(ctx)
 	payoutCount, _ := h.queries.CountStripePayouts(ctx)
+	syncFromDate, _ := h.queries.GetSetting(ctx, "charges_sync_from_date")
 	data := views.SyncPageData{
 		SyncStates:         states,
 		UnsyncedCharges:    int64(len(unsyncedChargeList)),
@@ -88,6 +89,7 @@ func (h *SyncHandler) renderSyncStatus(w http.ResponseWriter, r *http.Request, f
 		PendingVouchers:    pendingVouchers,
 		Flash:              flash,
 		IsFirstSync:        chargeCount == 0 && payoutCount == 0,
+		SyncFromDateSet:    syncFromDate != nil && syncFromDate.Value != "",
 	}
 	if err := views.SyncStatusSection(data).Render(ctx, w); err != nil {
 		log.Printf("render sync status: %v", err)

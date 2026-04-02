@@ -24,6 +24,7 @@ type SyncPageData struct {
 	PendingVouchers    []db.FortnoxVoucher
 	Flash              string
 	IsFirstSync        bool // true when the local DB has no charges or payouts yet
+	SyncFromDateSet    bool // true when charges_sync_from_date setting is configured
 }
 
 func SyncPage(d SyncPageData) templ.Component {
@@ -126,8 +127,8 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if d.IsFirstSync {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<p class=\"text-muted\">Första synken — vill du bestämma hur långt tillbaka data hämtas? <a href=\"/settings#sync-from-date\">Ange startdatum i inställningar</a>.</p>")
+		if d.IsFirstSync && !d.SyncFromDateSet {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"flash flash-warning\">Första synken — vill du bestämma hur långt tillbaka data hämtas? <a href=\"/settings#sync-from-date\">Ange startdatum i inställningar</a>.</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -144,7 +145,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d betalning(ar) och %d utbetalning(ar) väntar på bokföring.", d.UnsyncedCharges, d.UnsyncedPayouts))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 59, Col: 123}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 60, Col: 123}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -177,7 +178,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", len(d.UnsyncedChargeList)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 75, Col: 68}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 76, Col: 68}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
@@ -195,7 +196,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 					var templ_7745c5c3_Var6 string
 					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(c.ID)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 89, Col: 19}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 90, Col: 19}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 					if templ_7745c5c3_Err != nil {
@@ -208,7 +209,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 					var templ_7745c5c3_Var7 string
 					templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%.2f", float64(c.Amount)/100))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 90, Col: 57}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 91, Col: 57}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 					if templ_7745c5c3_Err != nil {
@@ -221,7 +222,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 					var templ_7745c5c3_Var8 string
 					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(c.Currency)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 91, Col: 25}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 92, Col: 25}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 					if templ_7745c5c3_Err != nil {
@@ -234,7 +235,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 					var templ_7745c5c3_Var9 string
 					templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(c.Status)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 92, Col: 23}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 93, Col: 23}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 					if templ_7745c5c3_Err != nil {
@@ -247,7 +248,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 					var templ_7745c5c3_Var10 string
 					templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(c.Description.String)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 93, Col: 35}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 94, Col: 35}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 					if templ_7745c5c3_Err != nil {
@@ -271,7 +272,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", len(d.UnsyncedPayoutList)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 100, Col: 70}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 101, Col: 70}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -289,7 +290,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 					var templ_7745c5c3_Var12 string
 					templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(p.ID)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 114, Col: 19}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 115, Col: 19}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 					if templ_7745c5c3_Err != nil {
@@ -302,7 +303,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 					var templ_7745c5c3_Var13 string
 					templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%.2f", float64(p.Amount)/100))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 115, Col: 57}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 116, Col: 57}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 					if templ_7745c5c3_Err != nil {
@@ -315,7 +316,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 					var templ_7745c5c3_Var14 string
 					templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(p.Currency)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 116, Col: 25}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 117, Col: 25}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 					if templ_7745c5c3_Err != nil {
@@ -328,7 +329,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 					var templ_7745c5c3_Var15 string
 					templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(p.Status)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 117, Col: 23}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 118, Col: 23}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 					if templ_7745c5c3_Err != nil {
@@ -341,7 +342,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 					var templ_7745c5c3_Var16 string
 					templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(time.Unix(p.ArrivalDate, 0).Format("2006-01-02"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 118, Col: 63}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 119, Col: 63}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 					if templ_7745c5c3_Err != nil {
@@ -370,7 +371,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d verifikation(er) skapades lokalt men fick inget svar från Fortnox. Kontrollera om de finns i Fortnox och radera dem manuellt om de är dubbletter. Dessa skickas inte automatiskt igen.", len(d.PendingVouchers)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 130, Col: 233}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 131, Col: 233}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
@@ -388,7 +389,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 				var templ_7745c5c3_Var18 string
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(v.SourceType)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 146, Col: 26}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 147, Col: 26}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -401,7 +402,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(v.SourceID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 147, Col: 24}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 148, Col: 24}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 				if templ_7745c5c3_Err != nil {
@@ -414,7 +415,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(v.VoucherDate)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 148, Col: 27}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 149, Col: 27}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 				if templ_7745c5c3_Err != nil {
@@ -427,7 +428,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(v.Description.String)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 149, Col: 34}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 150, Col: 34}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 				if templ_7745c5c3_Err != nil {
@@ -440,7 +441,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(v.CreatedAt)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 150, Col: 25}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 151, Col: 25}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {
@@ -453,7 +454,7 @@ func SyncStatusSection(d SyncPageData) templ.Component {
 				var templ_7745c5c3_Var23 string
 				templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/sync/fortnox/retry/%d", v.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 154, Col: 63}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sync.templ`, Line: 155, Col: 63}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 				if templ_7745c5c3_Err != nil {
