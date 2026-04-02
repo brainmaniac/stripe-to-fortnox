@@ -47,11 +47,12 @@ type fortnoxInvoiceRow struct {
 
 type fortnoxInvoiceRequest struct {
 	Invoice struct {
-		CustomerNumber string              `json:"CustomerNumber"`
-		Currency       string              `json:"Currency"`
-		InvoiceDate    string              `json:"InvoiceDate"`
-		Comments       string              `json:"Comments,omitempty"`
-		InvoiceRows    []fortnoxInvoiceRow `json:"InvoiceRows"`
+		CustomerNumber          string              `json:"CustomerNumber"`
+		Currency                string              `json:"Currency"`
+		InvoiceDate             string              `json:"InvoiceDate"`
+		Comments                string              `json:"Comments,omitempty"`
+		ExternalInvoiceReference1 string            `json:"ExternalInvoiceReference1,omitempty"`
+		InvoiceRows             []fortnoxInvoiceRow `json:"InvoiceRows"`
 	} `json:"Invoice"`
 }
 
@@ -62,12 +63,14 @@ type fortnoxInvoiceResponse struct {
 }
 
 type fortnoxInvoicePaymentRequest struct {
-	Payment struct {
-		InvoiceNumber string  `json:"InvoiceNumber"`
-		Amount        float64 `json:"Amount"`
-		PaymentDate   string  `json:"PaymentDate"`
-		AccountNumber int     `json:"AccountNumber"`
-	} `json:"Payment"`
+	InvoicePayment struct {
+		InvoiceNumber        int     `json:"InvoiceNumber"`
+		Amount               float64 `json:"Amount"`
+		AmountCurrency       float64 `json:"AmountCurrency"`
+		Currency             string  `json:"Currency"`
+		PaymentDate          string  `json:"PaymentDate"`
+		ModeOfPaymentAccount int     `json:"ModeOfPaymentAccount"`
+	} `json:"InvoicePayment"`
 }
 
 // EnsureFortnoxCustomer returns the Fortnox CustomerNumber for a Stripe customer,
@@ -159,6 +162,7 @@ func (s *InvoiceService) CreateInvoice(ctx context.Context, charge db.StripeChar
 	req.Invoice.Currency = strings.ToUpper(charge.Currency)
 	req.Invoice.InvoiceDate = time.Unix(charge.CreatedAt, 0).Format("2006-01-02")
 	req.Invoice.Comments = "Stripe " + charge.ID
+	req.Invoice.ExternalInvoiceReference1 = charge.ID
 	req.Invoice.InvoiceRows = []fortnoxInvoiceRow{
 		{
 			AccountNumber:     accountNum,
@@ -198,8 +202,9 @@ func (s *InvoiceService) CreateInvoice(ctx context.Context, charge db.StripeChar
 
 // MarkInvoicePaid records an invoice payment in Fortnox, crediting the Stripe clearing account (1521).
 // amountOre is the full invoice amount in öre (the same as the original charge amount).
+// currency is the ISO 4217 currency code of the charge (e.g. "USD").
 // chargeID is stored locally to track that this payment has been recorded (idempotency).
-func (s *InvoiceService) MarkInvoicePaid(ctx context.Context, invoiceNumber, chargeID string, amountOre int64, paymentDate time.Time) error {
+func (s *InvoiceService) MarkInvoicePaid(ctx context.Context, invoiceNumber, chargeID, currency string, amountOre int64, paymentDate time.Time) error {
 	clearingKonto, err := s.resolver.AccountByKontotyp(ctx, KontotypAvstämningskonto, "SEK")
 	if err != nil {
 		return fmt.Errorf("resolve clearing account: %w", err)
@@ -208,12 +213,18 @@ func (s *InvoiceService) MarkInvoicePaid(ctx context.Context, invoiceNumber, cha
 	if err != nil {
 		return fmt.Errorf("invalid clearing account %q: %w", clearingKonto, err)
 	}
+	invoiceNum, err := strconv.Atoi(invoiceNumber)
+	if err != nil {
+		return fmt.Errorf("invalid invoice number %q: %w", invoiceNumber, err)
+	}
 
 	req := fortnoxInvoicePaymentRequest{}
-	req.Payment.InvoiceNumber = invoiceNumber
-	req.Payment.Amount = oreToKronor(amountOre)
-	req.Payment.PaymentDate = paymentDate.Format("2006-01-02")
-	req.Payment.AccountNumber = clearingNum
+	req.InvoicePayment.InvoiceNumber = invoiceNum
+	req.InvoicePayment.Amount = 0 // Fortnox calculates SEK equivalent from AmountCurrency
+	req.InvoicePayment.AmountCurrency = oreToKronor(amountOre)
+	req.InvoicePayment.Currency = strings.ToUpper(currency)
+	req.InvoicePayment.PaymentDate = paymentDate.Format("2006-01-02")
+	req.InvoicePayment.ModeOfPaymentAccount = clearingNum
 
 	if _, err := s.api.Post(ctx, "invoicepayments", req); err != nil {
 		return fmt.Errorf("post invoicepayment: %w", err)

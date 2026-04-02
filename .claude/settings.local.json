@@ -17,7 +17,26 @@
       "Bash(unzip ngrok-v3-stable-darwin-amd64.zip)",
       "Bash(sudo mv:*)",
       "Bash(grep:*)",
-      "WebFetch(domain:support.fortnox.se)"
+      "WebFetch(domain:support.fortnox.se)",
+      "Bash(curl -s \"https://apps.fortnox.se/apidocs#tag/InvoicePaymentsResource\")",
+      "Bash(curl -s \"https://apps.fortnox.se/apidocs\")",
+      "Bash(python3 -c \"import sys,re; content=sys.stdin.read\\(\\); print\\(re.findall\\(r''''\\(?:spec|openapi|swagger\\)[^\\\\s\"\"<>]*\\\\.\\(?:json|yaml\\)'''', content\\)[:10]\\)\")",
+      "Bash(curl -s \"https://apps.fortnox.se/apidocs/\" -I)",
+      "Bash(python3 -c \"import sys; data=sys.stdin.read\\(\\); idx=data.find\\(''''Redoc''''\\); print\\(data[max\\(0,idx-200\\):idx+500]\\)\")",
+      "WebFetch(domain:github.com)",
+      "Bash(curl -s \"https://apps.fortnox.se/apidocs#tag/fortnox_InvoicePayments/operation/InvoicePaymentController_doCreate\")",
+      "Bash(curl -s \"https://apps.fortnox.se/openapi.json\" -o /tmp/fortnox-openapi.json)",
+      "Read(//tmp/**)",
+      "Bash(for url:*)",
+      "Bash(do)",
+      "Bash(echo -n \"$url -> \")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"$url\")",
+      "Bash(done)",
+      "Bash(curl -s https://apps.fortnox.se/apidocs/swagger.json -o /tmp/fortnox_swagger.json)",
+      "Bash(curl -sL -A \"Mozilla/5.0\" \"https://apps.fortnox.se/apidocs/swagger.json\")",
+      "Bash(curl -sL -H \"Accept: application/json\" \"https://apps.fortnox.se/apidocs/swagger.json\")",
+      "WebFetch(domain:webcache.googleusercontent.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }

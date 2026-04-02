@@ -128,7 +128,7 @@ func reconcileInvoicePayments(ctx context.Context, queries *db.Queries, invoiceS
 	}
 	for _, r := range charges {
 		payoutDate := time.Unix(r.PayoutArrivalDate, 0)
-		if err := invoiceService.MarkInvoicePaid(ctx, r.FortnoxInvoiceNumber.String, r.ID, r.Amount, payoutDate); err != nil {
+		if err := invoiceService.MarkInvoicePaid(ctx, r.FortnoxInvoiceNumber.String, r.ID, r.Currency, r.Amount, payoutDate); err != nil {
 			log.Printf("reconcile: mark invoice paid %s for charge %s: %v", r.FortnoxInvoiceNumber.String, r.ID, err)
 		} else {
 			log.Printf("reconcile: marked invoice %s paid for charge %s", r.FortnoxInvoiceNumber.String, r.ID)
@@ -192,7 +192,7 @@ func processPayout(
 			charge.FortnoxInvoiceNumber.String != "" &&
 			charge.FortnoxInvoiceNumber.String != "LEGACY" &&
 			!charge.FortnoxInvoicePaid {
-			if err := invoiceService.MarkInvoicePaid(ctx, charge.FortnoxInvoiceNumber.String, chargeID, charge.Amount, payoutDate); err != nil {
+			if err := invoiceService.MarkInvoicePaid(ctx, charge.FortnoxInvoiceNumber.String, chargeID, charge.Currency, charge.Amount, payoutDate); err != nil {
 				log.Printf("mark invoice paid %s for charge %s: %v", charge.FortnoxInvoiceNumber.String, chargeID, err)
 			}
 		}
