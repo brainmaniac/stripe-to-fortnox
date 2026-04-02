@@ -232,17 +232,16 @@ func (q *Queries) SetChargeInvoicePaid(ctx context.Context, chargeID string) err
 }
 
 // ListChargesNeedingInvoicePayment returns charges that have a Fortnox invoice but whose
-// invoice payment has not yet been recorded, and whose payout is already confirmed in Fortnox.
+// invoice payment has not yet been recorded. Used as a fallback for charges where
+// MarkInvoicePaid was not called at invoice-creation time.
 func (q *Queries) ListChargesNeedingInvoicePayment(ctx context.Context) ([]ChargePaymentNeeded, error) {
 	const query = `
 SELECT sc.id, sc.payment_intent_id, sc.amount, sc.amount_captured, sc.currency, sc.status,
        sc.balance_transaction_id, sc.customer_id, sc.description, sc.metadata, sc.created_at,
        sc.billing_country, sc.fortnox_invoice_number, sc.fortnox_invoice_paid,
-       sp.arrival_date
+       bt.available_on
 FROM stripe_charges sc
-JOIN stripe_balance_transactions bt ON bt.source_id = sc.id AND bt.type = 'charge' AND bt.payout_id IS NOT NULL
-JOIN stripe_payouts sp ON sp.id = bt.payout_id
-JOIN fortnox_vouchers fv ON fv.source_id = bt.payout_id AND fv.source_type = 'payout' AND fv.status = 'confirmed'
+JOIN stripe_balance_transactions bt ON bt.source_id = sc.id AND bt.type = 'charge'
 WHERE sc.fortnox_invoice_number IS NOT NULL
   AND sc.fortnox_invoice_number NOT IN ('', 'LEGACY')
   AND sc.fortnox_invoice_paid = 0`
@@ -258,7 +257,7 @@ WHERE sc.fortnox_invoice_number IS NOT NULL
 			&r.ID, &r.PaymentIntentID, &r.Amount, &r.AmountCaptured, &r.Currency, &r.Status,
 			&r.BalanceTransactionID, &r.CustomerID, &r.Description, &r.Metadata, &r.CreatedAt,
 			&r.BillingCountry, &r.FortnoxInvoiceNumber, &r.FortnoxInvoicePaid,
-			&r.PayoutArrivalDate,
+			&r.AvailableOn,
 		); err != nil {
 			return nil, err
 		}

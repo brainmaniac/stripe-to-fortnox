@@ -72,7 +72,7 @@ func (s *Scheduler) syncAll(ctx context.Context) {
 		log.Printf("scheduler: stripe sync error: %v", err)
 	}
 
-	// Sync charges → Fortnox invoices.
+	// Sync charges → Fortnox invoices (B) + invoice payments (C).
 	charges, err := s.queries.ListUnsyncedCharges(ctx)
 	if err != nil {
 		log.Printf("scheduler: list unsynced charges: %v", err)
@@ -87,6 +87,16 @@ func (s *Scheduler) syncAll(ctx context.Context) {
 		}
 		log.Printf("scheduler: created fortnox invoice %s for charge %s", invoiceNum, charge.ID)
 		s.queries.InsertSyncLog(ctx, "charges", charge.ID, "fortnox_invoice_created", invoiceNum)
+
+		bt, err := s.queries.GetBalanceTransactionBySource(ctx, charge.ID)
+		if err != nil || bt == nil {
+			log.Printf("scheduler: no balance transaction for charge %s, skipping invoice payment", charge.ID)
+			continue
+		}
+		paymentDate := time.Unix(bt.AvailableOn, 0)
+		if err := s.invoiceService.MarkInvoicePaid(ctx, invoiceNum, charge.ID, charge.Currency, charge.Amount, paymentDate); err != nil {
+			log.Printf("scheduler: mark invoice paid for charge %s: %v", charge.ID, err)
+		}
 	}
 
 	// Sync payouts → invoicepayments + fee vouchers + payout vouchers.
@@ -95,8 +105,6 @@ func (s *Scheduler) syncAll(ctx context.Context) {
 		log.Printf("scheduler: list unsynced payouts: %v", err)
 	}
 	for _, payout := range payouts {
-		payoutDate := time.Unix(payout.ArrivalDate, 0)
-
 		txns, err := s.queries.ListBalanceTransactionsForPayout(ctx, payout.ID)
 		if err != nil {
 			log.Printf("scheduler: list balance txns for payout %s: %v", payout.ID, err)
@@ -109,21 +117,6 @@ func (s *Scheduler) syncAll(ctx context.Context) {
 				continue
 			}
 			chargeID := txn.SourceID.String
-
-			charge, err := s.queries.GetStripeCharge(ctx, chargeID)
-			if err != nil || charge == nil {
-				log.Printf("scheduler: get charge %s: %v", chargeID, err)
-				continue
-			}
-
-			if charge.FortnoxInvoiceNumber.Valid &&
-				charge.FortnoxInvoiceNumber.String != "" &&
-				charge.FortnoxInvoiceNumber.String != "LEGACY" &&
-				!charge.FortnoxInvoicePaid {
-				if err := s.invoiceService.MarkInvoicePaid(ctx, charge.FortnoxInvoiceNumber.String, chargeID, charge.Currency, charge.Amount, payoutDate); err != nil {
-					log.Printf("scheduler: mark invoice paid %s: %v", charge.FortnoxInvoiceNumber.String, err)
-				}
-			}
 
 			if txn.Fee > 0 {
 				txnDate := time.Unix(txn.CreatedAt, 0)

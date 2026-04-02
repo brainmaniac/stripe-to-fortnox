@@ -57,7 +57,7 @@ func (h *SyncHandler) TriggerFortnoxSync(w http.ResponseWriter, r *http.Request)
 		ctx := context.Background()
 		syncChargesToFortnox(ctx, h.queries, h.stripeSyncer, h.invoiceService)
 		reconcileInvoicePayments(ctx, h.queries, h.invoiceService)
-		syncPayoutsToFortnox(ctx, h.queries, h.invoiceService, h.voucherCreator)
+		syncPayoutsToFortnox(ctx, h.queries, h.voucherCreator)
 	}()
 	if r.Header.Get("HX-Request") == "true" {
 		h.renderSyncStatus(w, r, "fortnox_sync_started")
@@ -94,7 +94,8 @@ func (h *SyncHandler) renderSyncStatus(w http.ResponseWriter, r *http.Request, f
 	}
 }
 
-// syncChargesToFortnox creates a Fortnox invoice for each unsynced Stripe charge.
+// syncChargesToFortnox creates a Fortnox invoice (B) and invoice payment (C) for each unsynced Stripe charge.
+// The C payment date is set to the balance transaction's available_on — the date Stripe will make the funds available.
 func syncChargesToFortnox(ctx context.Context, queries *db.Queries, stripeSyncer *stripesync.Syncer, invoiceService *fortnox.InvoiceService) {
 	charges, err := queries.ListUnsyncedCharges(ctx)
 	if err != nil {
@@ -114,6 +115,16 @@ func syncChargesToFortnox(ctx context.Context, queries *db.Queries, stripeSyncer
 		}
 		log.Printf("created fortnox invoice %s for charge %s", invoiceNum, charge.ID)
 		queries.InsertSyncLog(ctx, "charges", charge.ID, "fortnox_invoice_created", invoiceNum)
+
+		bt, err := queries.GetBalanceTransactionBySource(ctx, charge.ID)
+		if err != nil || bt == nil {
+			log.Printf("no balance transaction for charge %s, skipping invoice payment", charge.ID)
+			continue
+		}
+		paymentDate := time.Unix(bt.AvailableOn, 0)
+		if err := invoiceService.MarkInvoicePaid(ctx, invoiceNum, charge.ID, charge.Currency, charge.Amount, paymentDate); err != nil {
+			log.Printf("mark invoice paid for charge %s: %v", charge.ID, err)
+		}
 	}
 }
 
@@ -127,8 +138,8 @@ func reconcileInvoicePayments(ctx context.Context, queries *db.Queries, invoiceS
 		return
 	}
 	for _, r := range charges {
-		payoutDate := time.Unix(r.PayoutArrivalDate, 0)
-		if err := invoiceService.MarkInvoicePaid(ctx, r.FortnoxInvoiceNumber.String, r.ID, r.Currency, r.Amount, payoutDate); err != nil {
+		paymentDate := time.Unix(r.AvailableOn, 0)
+		if err := invoiceService.MarkInvoicePaid(ctx, r.FortnoxInvoiceNumber.String, r.ID, r.Currency, r.Amount, paymentDate); err != nil {
 			log.Printf("reconcile: mark invoice paid %s for charge %s: %v", r.FortnoxInvoiceNumber.String, r.ID, err)
 		} else {
 			log.Printf("reconcile: marked invoice %s paid for charge %s", r.FortnoxInvoiceNumber.String, r.ID)
@@ -137,12 +148,11 @@ func reconcileInvoicePayments(ctx context.Context, queries *db.Queries, invoiceS
 }
 
 // syncPayoutsToFortnox processes each unsynced payout:
-// for every charge in the payout's balance transactions it records the invoice payment
-// and creates a fee voucher, then creates the payout voucher (bank ← clearing).
+// for every charge in the payout's balance transactions it creates a fee voucher,
+// then creates the payout voucher (bank ← clearing).
 func syncPayoutsToFortnox(
 	ctx context.Context,
 	queries *db.Queries,
-	invoiceService *fortnox.InvoiceService,
 	voucherCreator *fortnox.VoucherCreator,
 ) {
 	payouts, err := queries.ListUnsyncedPayouts(ctx)
@@ -151,7 +161,7 @@ func syncPayoutsToFortnox(
 		return
 	}
 	for _, payout := range payouts {
-		if err := processPayout(ctx, queries, invoiceService, voucherCreator, payout); err != nil {
+		if err := processPayout(ctx, queries, voucherCreator, payout); err != nil {
 			log.Printf("process payout %s: %v", payout.ID, err)
 			queries.InsertSyncLog(ctx, "payouts", payout.ID, "fortnox_error", err.Error())
 			continue
@@ -164,12 +174,9 @@ func syncPayoutsToFortnox(
 func processPayout(
 	ctx context.Context,
 	queries *db.Queries,
-	invoiceService *fortnox.InvoiceService,
 	voucherCreator *fortnox.VoucherCreator,
 	payout db.StripePayout,
 ) error {
-	payoutDate := time.Unix(payout.ArrivalDate, 0)
-
 	txns, err := queries.ListBalanceTransactionsForPayout(ctx, payout.ID)
 	if err != nil {
 		return err
@@ -185,16 +192,6 @@ func processPayout(
 		if err != nil || charge == nil {
 			log.Printf("get charge %s for payout %s: %v", chargeID, payout.ID, err)
 			continue
-		}
-
-		// Mark the invoice paid if the charge was synced via the invoice flow and not already recorded.
-		if charge.FortnoxInvoiceNumber.Valid &&
-			charge.FortnoxInvoiceNumber.String != "" &&
-			charge.FortnoxInvoiceNumber.String != "LEGACY" &&
-			!charge.FortnoxInvoicePaid {
-			if err := invoiceService.MarkInvoicePaid(ctx, charge.FortnoxInvoiceNumber.String, chargeID, charge.Currency, charge.Amount, payoutDate); err != nil {
-				log.Printf("mark invoice paid %s for charge %s: %v", charge.FortnoxInvoiceNumber.String, chargeID, err)
-			}
 		}
 
 		// Create fee voucher for the Stripe processing fee (omvänd moms applies).
@@ -307,7 +304,7 @@ func (h *SyncHandler) RetryPendingVoucher(w http.ResponseWriter, r *http.Request
 			}
 			for _, p := range payouts {
 				if p.ID == target.SourceID {
-					if err := processPayout(ctx, h.queries, h.invoiceService, h.voucherCreator, p); err != nil {
+					if err := processPayout(ctx, h.queries, h.voucherCreator, p); err != nil {
 						log.Printf("retry payout %s: %v", p.ID, err)
 					}
 					return

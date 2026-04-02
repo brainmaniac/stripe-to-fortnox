@@ -42,11 +42,11 @@ type StripeCharge struct {
 }
 
 // ChargePaymentNeeded is returned by ListChargesNeedingInvoicePayment.
-// It pairs a charge (with a Fortnox invoice) with the arrival date of its already-synced payout,
-// so MarkInvoicePaid can be called retroactively.
+// It pairs a charge (with a Fortnox invoice) with the balance transaction's available_on date,
+// so MarkInvoicePaid can be called as a fallback if it wasn't done at invoice-creation time.
 type ChargePaymentNeeded struct {
 	StripeCharge
-	PayoutArrivalDate int64
+	AvailableOn int64
 }
 
 type AccountMapping struct {
