@@ -67,7 +67,6 @@ type fortnoxInvoicePaymentRequest struct {
 	InvoicePayment struct {
 		InvoiceNumber        int     `json:"InvoiceNumber"`
 		AmountCurrency       float64 `json:"AmountCurrency"`
-		Currency             string  `json:"Currency"`
 		PaymentDate          string  `json:"PaymentDate"`
 		ModeOfPaymentAccount int     `json:"ModeOfPaymentAccount"`
 	} `json:"InvoicePayment"`
@@ -194,10 +193,9 @@ func (s *InvoiceService) CreateInvoice(ctx context.Context, charge db.StripeChar
 }
 
 // MarkInvoicePaid records an invoice payment in Fortnox, crediting the Stripe clearing account (1521).
-// amountOre is the full invoice amount in öre (the same as the original charge amount).
-// currency is the ISO 4217 currency code of the charge (e.g. "USD").
+// amountOre is the full invoice amount in the invoice's currency (smallest unit).
 // chargeID is stored locally to track that this payment has been recorded (idempotency).
-func (s *InvoiceService) MarkInvoicePaid(ctx context.Context, invoiceNumber, chargeID, currency string, amountOre int64, paymentDate time.Time) error {
+func (s *InvoiceService) MarkInvoicePaid(ctx context.Context, invoiceNumber, chargeID string, amountOre int64, paymentDate time.Time) error {
 	clearingKonto, err := s.resolver.AccountByKontotyp(ctx, KontotypAvstämningskonto, "SEK")
 	if err != nil {
 		return fmt.Errorf("resolve clearing account: %w", err)
@@ -214,7 +212,6 @@ func (s *InvoiceService) MarkInvoicePaid(ctx context.Context, invoiceNumber, cha
 	req := fortnoxInvoicePaymentRequest{}
 	req.InvoicePayment.InvoiceNumber = invoiceNum
 	req.InvoicePayment.AmountCurrency = toMajorUnit(amountOre)
-	req.InvoicePayment.Currency = strings.ToUpper(currency)
 	req.InvoicePayment.PaymentDate = paymentDate.Format("2006-01-02")
 	req.InvoicePayment.ModeOfPaymentAccount = clearingNum
 

@@ -124,7 +124,7 @@ func syncChargesToFortnox(ctx context.Context, queries *db.Queries, stripeSyncer
 			continue
 		}
 		paymentDate := time.Unix(bt.AvailableOn, 0)
-		if err := invoiceService.MarkInvoicePaid(ctx, invoiceNum, charge.ID, charge.Currency, charge.Amount, paymentDate); err != nil {
+		if err := invoiceService.MarkInvoicePaid(ctx, invoiceNum, charge.ID, charge.Amount, paymentDate); err != nil {
 			log.Printf("mark invoice paid for charge %s: %v", charge.ID, err)
 		}
 	}
@@ -141,7 +141,7 @@ func reconcileInvoicePayments(ctx context.Context, queries *db.Queries, invoiceS
 	}
 	for _, r := range charges {
 		paymentDate := time.Unix(r.AvailableOn, 0)
-		if err := invoiceService.MarkInvoicePaid(ctx, r.FortnoxInvoiceNumber.String, r.ID, r.Currency, r.Amount, paymentDate); err != nil {
+		if err := invoiceService.MarkInvoicePaid(ctx, r.FortnoxInvoiceNumber.String, r.ID, r.Amount, paymentDate); err != nil {
 			log.Printf("reconcile: mark invoice paid %s for charge %s: %v", r.FortnoxInvoiceNumber.String, r.ID, err)
 		} else {
 			log.Printf("reconcile: marked invoice %s paid for charge %s", r.FortnoxInvoiceNumber.String, r.ID)

@@ -94,7 +94,7 @@ func (s *Scheduler) syncAll(ctx context.Context) {
 			continue
 		}
 		paymentDate := time.Unix(bt.AvailableOn, 0)
-		if err := s.invoiceService.MarkInvoicePaid(ctx, invoiceNum, charge.ID, charge.Currency, charge.Amount, paymentDate); err != nil {
+		if err := s.invoiceService.MarkInvoicePaid(ctx, invoiceNum, charge.ID, charge.Amount, paymentDate); err != nil {
 			log.Printf("scheduler: mark invoice paid for charge %s: %v", charge.ID, err)
 		}
 	}
@@ -106,7 +106,7 @@ func (s *Scheduler) syncAll(ctx context.Context) {
 	}
 	for _, r := range unpaid {
 		paymentDate := time.Unix(r.AvailableOn, 0)
-		if err := s.invoiceService.MarkInvoicePaid(ctx, r.FortnoxInvoiceNumber.String, r.ID, r.Currency, r.Amount, paymentDate); err != nil {
+		if err := s.invoiceService.MarkInvoicePaid(ctx, r.FortnoxInvoiceNumber.String, r.ID, r.Amount, paymentDate); err != nil {
 			log.Printf("scheduler: mark invoice paid %s for charge %s: %v", r.FortnoxInvoiceNumber.String, r.ID, err)
 		}
 	}
