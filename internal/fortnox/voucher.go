@@ -123,9 +123,9 @@ func NewVoucherCreator(api *APIClient, queries *db.Queries, config AccountConfig
 	return &VoucherCreator{api: api, queries: queries, config: config}
 }
 
-// oreToKronor converts öre (smallest SEK unit) to kronor.
-func oreToKronor(ore int64) float64 {
-	return float64(ore) / 100.0
+// toMajorUnit converts a minor currency unit (cents, öre, pence) to the major unit (dollar, krona, pound).
+func toMajorUnit(minor int64) float64 {
+	return float64(minor) / 100.0
 }
 
 // CreateChargeVoucher creates a Fortnox voucher for a succeeded Stripe charge.
@@ -142,7 +142,7 @@ func (vc *VoucherCreator) CreateChargeVoucher(ctx context.Context, charge db.Str
 		return existing, nil
 	}
 
-	amount := oreToKronor(charge.Amount)
+	amount := toMajorUnit(charge.Amount)
 	revenueAcc := vc.config.revenueAccount(countryCode)
 
 	var rows []VoucherRow
@@ -168,7 +168,7 @@ func (vc *VoucherCreator) CreateChargeVoucher(ctx context.Context, charge db.Str
 	req.Voucher.TransactionDate = time.Unix(charge.CreatedAt, 0).Format("2006-01-02")
 	req.Voucher.VoucherRows = rows
 
-	return vc.postVoucher(ctx, req, "charge", charge.ID, charge.Amount)
+	return vc.postVoucher(ctx, req, "charge", charge.ID)
 }
 
 // CreatePayoutVoucher creates a Fortnox voucher for a Stripe payout.
@@ -181,7 +181,7 @@ func (vc *VoucherCreator) CreatePayoutVoucher(ctx context.Context, payout db.Str
 		return existing, nil
 	}
 
-	amount := oreToKronor(payout.Amount)
+	amount := toMajorUnit(payout.Amount)
 	req := VoucherRequest{}
 	req.Voucher.Description = fmt.Sprintf("Stripe utbetalning %s", payout.ID)
 	req.Voucher.VoucherSeries = vc.config.VoucherSeries
@@ -191,7 +191,7 @@ func (vc *VoucherCreator) CreatePayoutVoucher(ctx context.Context, payout db.Str
 		{Account: vc.config.StripeClearing, Credit: amount},
 	}
 
-	return vc.postVoucher(ctx, req, "payout", payout.ID, payout.Amount)
+	return vc.postVoucher(ctx, req, "payout", payout.ID)
 }
 
 // CreateFeeVoucher creates a Fortnox voucher for a Stripe processing fee with reverse VAT.
@@ -206,7 +206,7 @@ func (vc *VoucherCreator) CreateFeeVoucher(ctx context.Context, chargeID string,
 		return existing, nil
 	}
 
-	fee := oreToKronor(feeOre)
+	fee := toMajorUnit(feeOre)
 	reverseVAT := fee * (vc.config.VATPercent / 100.0)
 
 	req := VoucherRequest{}
@@ -220,14 +220,13 @@ func (vc *VoucherCreator) CreateFeeVoucher(ctx context.Context, chargeID string,
 		{Account: vc.config.StripeClearing, Credit: fee},
 	}
 
-	return vc.postVoucher(ctx, req, "fee", sourceID, feeOre)
+	return vc.postVoucher(ctx, req, "fee", sourceID)
 }
 
 func (vc *VoucherCreator) postVoucher(
 	ctx context.Context,
 	req VoucherRequest,
 	sourceType, sourceID string,
-	amountOre int64,
 ) (*db.FortnoxVoucher, error) {
 	// Sanity check: debit must equal credit.
 	var totalDebit, totalCredit float64

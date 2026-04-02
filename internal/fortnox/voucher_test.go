@@ -153,7 +153,7 @@ func TestVoucherBalancedCharge(t *testing.T) {
 	amounts := []int64{100, 1000, 9999, 10000, 99999}
 	for _, amt := range amounts {
 		for _, country := range []string{"SE", "DE", "US"} {
-			amount := oreToKronor(amt)
+			amount := toMajorUnit(amt)
 			revenueAcc := cfg.revenueAccount(country)
 
 			var rows []VoucherRow
@@ -208,7 +208,7 @@ func TestFeeVoucherReverseVAT(t *testing.T) {
 	}
 
 	// Verify the math: fee + reverseVAT debit should equal reverseVAT credit + 1521 credit.
-	fee := oreToKronor(feeOre)
+	fee := toMajorUnit(feeOre)
 	reverseVAT := fee * (DefaultAccountConfig().VATPercent / 100.0)
 	totalDebit := fee + reverseVAT
 	totalCredit := reverseVAT + fee // credit 2614 + credit 1521
@@ -255,7 +255,7 @@ func TestPayoutVoucherBalance(t *testing.T) {
 
 func TestPayoutVoucherAccounts(t *testing.T) {
 	cfg := DefaultAccountConfig()
-	amount := oreToKronor(50000)
+	amount := toMajorUnit(50000)
 	rows := []VoucherRow{
 		{Account: cfg.BankAccount, Debit: amount},
 		{Account: cfg.StripeClearing, Credit: amount},
@@ -379,7 +379,7 @@ func TestPostVoucherRejectsImbalanced(t *testing.T) {
 		{Account: "3010", Credit: 90}, // intentionally wrong
 	}
 
-	_, err := vc.postVoucher(context.Background(), req, "charge", "ch_bad", 10000)
+	_, err := vc.postVoucher(context.Background(), req, "charge", "ch_bad")
 	if err == nil {
 		t.Error("expected error for imbalanced voucher")
 	}
@@ -408,18 +408,18 @@ func TestSEVATSplit(t *testing.T) {
 	}
 }
 
-// ── oreToKronor ───────────────────────────────────────────────────────────────
+// ── toMajorUnit ───────────────────────────────────────────────────────────────
 
-func TestOreToKronor(t *testing.T) {
-	cases := []struct{ ore int64; want float64 }{
+func TestToMajorUnit(t *testing.T) {
+	cases := []struct{ minor int64; want float64 }{
 		{100, 1.0},
 		{1000, 10.0},
 		{10000, 100.0},
 		{1, 0.01},
 	}
 	for _, tc := range cases {
-		if got := oreToKronor(tc.ore); got != tc.want {
-			t.Errorf("oreToKronor(%d) = %f, want %f", tc.ore, got, tc.want)
+		if got := toMajorUnit(tc.minor); got != tc.want {
+			t.Errorf("toMajorUnit(%d) = %f, want %f", tc.minor, got, tc.want)
 		}
 	}
 }

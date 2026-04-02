@@ -65,7 +65,6 @@ type fortnoxInvoiceResponse struct {
 type fortnoxInvoicePaymentRequest struct {
 	InvoicePayment struct {
 		InvoiceNumber        int     `json:"InvoiceNumber"`
-		Amount               float64 `json:"Amount"`
 		AmountCurrency       float64 `json:"AmountCurrency"`
 		Currency             string  `json:"Currency"`
 		PaymentDate          string  `json:"PaymentDate"`
@@ -144,7 +143,7 @@ func (s *InvoiceService) CreateInvoice(ctx context.Context, charge db.StripeChar
 		return "", fmt.Errorf("invalid account number %q: %w", mapping.Konto, err)
 	}
 
-	amountKronor := oreToKronor(charge.Amount)
+	amountKronor := toMajorUnit(charge.Amount)
 	vatRate := 0.0
 	if mapping.Momssats.Valid {
 		vatRate = mapping.Momssats.Float64
@@ -220,8 +219,7 @@ func (s *InvoiceService) MarkInvoicePaid(ctx context.Context, invoiceNumber, cha
 
 	req := fortnoxInvoicePaymentRequest{}
 	req.InvoicePayment.InvoiceNumber = invoiceNum
-	req.InvoicePayment.Amount = 0 // Fortnox calculates SEK equivalent from AmountCurrency
-	req.InvoicePayment.AmountCurrency = oreToKronor(amountOre)
+	req.InvoicePayment.AmountCurrency = toMajorUnit(amountOre)
 	req.InvoicePayment.Currency = strings.ToUpper(currency)
 	req.InvoicePayment.PaymentDate = paymentDate.Format("2006-01-02")
 	req.InvoicePayment.ModeOfPaymentAccount = clearingNum
