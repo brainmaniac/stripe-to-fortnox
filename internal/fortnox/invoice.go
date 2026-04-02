@@ -47,12 +47,13 @@ type fortnoxInvoiceRow struct {
 
 type fortnoxInvoiceRequest struct {
 	Invoice struct {
-		CustomerNumber          string              `json:"CustomerNumber"`
-		Currency                string              `json:"Currency"`
-		InvoiceDate             string              `json:"InvoiceDate"`
-		Comments                string              `json:"Comments,omitempty"`
-		ExternalInvoiceReference1 string            `json:"ExternalInvoiceReference1,omitempty"`
-		InvoiceRows             []fortnoxInvoiceRow `json:"InvoiceRows"`
+		CustomerNumber            string              `json:"CustomerNumber"`
+		Currency                  string              `json:"Currency"`
+		InvoiceDate               string              `json:"InvoiceDate"`
+		VATIncluded               bool                `json:"VATIncluded"`
+		Comments                  string              `json:"Comments,omitempty"`
+		ExternalInvoiceReference1 string              `json:"ExternalInvoiceReference1,omitempty"`
+		InvoiceRows               []fortnoxInvoiceRow `json:"InvoiceRows"`
 	} `json:"Invoice"`
 }
 
@@ -143,31 +144,24 @@ func (s *InvoiceService) CreateInvoice(ctx context.Context, charge db.StripeChar
 		return "", fmt.Errorf("invalid account number %q: %w", mapping.Konto, err)
 	}
 
-	amountKronor := toMajorUnit(charge.Amount)
-	vatRate := 0.0
+	vatRate := 0
 	if mapping.Momssats.Valid {
-		vatRate = mapping.Momssats.Float64
-	}
-
-	// Fortnox adds VAT on top of the row Price: total = Price * (1 + vatRate/100).
-	// We receive the total (charge.Amount), so: Price = total / (1 + vatRate/100).
-	priceExclVAT := amountKronor
-	if vatRate > 0 {
-		priceExclVAT = amountKronor / (1 + vatRate/100)
+		vatRate = int(mapping.Momssats.Float64)
 	}
 
 	req := fortnoxInvoiceRequest{}
 	req.Invoice.CustomerNumber = customerNum
 	req.Invoice.Currency = strings.ToUpper(charge.Currency)
 	req.Invoice.InvoiceDate = time.Unix(charge.CreatedAt, 0).Format("2006-01-02")
+	req.Invoice.VATIncluded = true
 	req.Invoice.Comments = "Stripe " + charge.ID
 	req.Invoice.ExternalInvoiceReference1 = charge.ID
 	req.Invoice.InvoiceRows = []fortnoxInvoiceRow{
 		{
 			AccountNumber:     accountNum,
 			Description:       charge.ID,
-			Price:             priceExclVAT,
-			VAT:               int(vatRate),
+			Price:             toMajorUnit(charge.Amount),
+			VAT:               vatRate,
 			DeliveredQuantity: 1,
 		},
 	}

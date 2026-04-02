@@ -99,6 +99,18 @@ func (s *Scheduler) syncAll(ctx context.Context) {
 		}
 	}
 
+	// Create C vouchers for charges invoiced in a previous run (balance transactions now available).
+	unpaid, err := s.queries.ListChargesNeedingInvoicePayment(ctx)
+	if err != nil {
+		log.Printf("scheduler: list charges needing invoice payment: %v", err)
+	}
+	for _, r := range unpaid {
+		paymentDate := time.Unix(r.AvailableOn, 0)
+		if err := s.invoiceService.MarkInvoicePaid(ctx, r.FortnoxInvoiceNumber.String, r.ID, r.Currency, r.Amount, paymentDate); err != nil {
+			log.Printf("scheduler: mark invoice paid %s for charge %s: %v", r.FortnoxInvoiceNumber.String, r.ID, err)
+		}
+	}
+
 	// Sync payouts → invoicepayments + fee vouchers + payout vouchers.
 	payouts, err := s.queries.ListUnsyncedPayouts(ctx)
 	if err != nil {

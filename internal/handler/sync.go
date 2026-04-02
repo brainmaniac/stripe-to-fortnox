@@ -188,12 +188,6 @@ func processPayout(
 		}
 		chargeID := txn.SourceID.String
 
-		charge, err := queries.GetStripeCharge(ctx, chargeID)
-		if err != nil || charge == nil {
-			log.Printf("get charge %s for payout %s: %v", chargeID, payout.ID, err)
-			continue
-		}
-
 		// Create fee voucher for the Stripe processing fee (omvänd moms applies).
 		if txn.Fee > 0 {
 			txnDate := time.Unix(txn.CreatedAt, 0)
