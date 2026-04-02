@@ -77,6 +77,8 @@ func (h *SyncHandler) renderSyncStatus(w http.ResponseWriter, r *http.Request, f
 	unsyncedChargeList, _ := h.queries.ListUnsyncedCharges(ctx)
 	unsyncedPayoutList, _ := h.queries.ListUnsyncedPayouts(ctx)
 	pendingVouchers, _ := h.queries.ListPendingFortnoxVouchers(ctx)
+	chargeCount, _ := h.queries.CountStripeCharges(ctx)
+	payoutCount, _ := h.queries.CountStripePayouts(ctx)
 	data := views.SyncPageData{
 		SyncStates:         states,
 		UnsyncedCharges:    int64(len(unsyncedChargeList)),
@@ -85,6 +87,7 @@ func (h *SyncHandler) renderSyncStatus(w http.ResponseWriter, r *http.Request, f
 		UnsyncedPayoutList: unsyncedPayoutList,
 		PendingVouchers:    pendingVouchers,
 		Flash:              flash,
+		IsFirstSync:        chargeCount == 0 && payoutCount == 0,
 	}
 	if err := views.SyncStatusSection(data).Render(ctx, w); err != nil {
 		log.Printf("render sync status: %v", err)
@@ -242,6 +245,8 @@ func (h *SyncHandler) SyncPage(w http.ResponseWriter, r *http.Request) {
 	unsyncedChargeList, _ := h.queries.ListUnsyncedCharges(ctx)
 	unsyncedPayoutList, _ := h.queries.ListUnsyncedPayouts(ctx)
 	pendingVouchers, _ := h.queries.ListPendingFortnoxVouchers(ctx)
+	chargeCount, _ := h.queries.CountStripeCharges(ctx)
+	payoutCount, _ := h.queries.CountStripePayouts(ctx)
 	data := views.SyncPageData{
 		SyncStates:         states,
 		UnsyncedCharges:    int64(len(unsyncedChargeList)),
@@ -250,6 +255,7 @@ func (h *SyncHandler) SyncPage(w http.ResponseWriter, r *http.Request) {
 		UnsyncedPayoutList: unsyncedPayoutList,
 		PendingVouchers:    pendingVouchers,
 		Flash:              r.URL.Query().Get("flash"),
+		IsFirstSync:        chargeCount == 0 && payoutCount == 0,
 	}
 	if err := views.SyncPage(data).Render(ctx, w); err != nil {
 		log.Printf("render sync page: %v", err)

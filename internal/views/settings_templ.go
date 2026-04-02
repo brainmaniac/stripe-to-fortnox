@@ -229,7 +229,7 @@ func Settings(d SettingsData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "\" placeholder=\"60\" min=\"0\"></div><button type=\"submit\" class=\"btn btn-primary\">Spara</button></form></section><section class=\"section\"><h2>Startdatum för synk</h2><p class=\"text-muted\">Hur långt tillbaka betalningar och utbetalningar hämtas från Stripe vid den första synkroniseringen (när databasen är tom). Påverkar inte befintliga synkar.</p><form method=\"POST\" action=\"/settings/sync-from-date\"><div class=\"form-group\" style=\"max-width:300px\"><label>Hämta från och med</label> <input type=\"date\" name=\"sync_from_date\" class=\"form-control\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "\" placeholder=\"60\" min=\"0\"></div><button type=\"submit\" class=\"btn btn-primary\">Spara</button></form></section><section id=\"sync-from-date\" class=\"section\"><h2>Startdatum för synk</h2><p class=\"text-muted\">Hur långt tillbaka betalningar och utbetalningar hämtas från Stripe vid den första synkroniseringen (när databasen är tom). Påverkar inte befintliga synkar.</p><form method=\"POST\" action=\"/settings/sync-from-date\"><div class=\"form-group\" style=\"max-width:300px\"><label>Hämta från och med</label> <input type=\"date\" name=\"sync_from_date\" class=\"form-control\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

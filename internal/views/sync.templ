@@ -15,6 +15,7 @@ type SyncPageData struct {
 	UnsyncedPayoutList []db.StripePayout
 	PendingVouchers    []db.FortnoxVoucher
 	Flash              string
+	IsFirstSync        bool // true when the local DB has no charges or payouts yet
 }
 
 templ SyncPage(d SyncPageData) {
@@ -40,6 +41,9 @@ templ SyncStatusSection(d SyncPageData) {
 		<section class="section">
 			<h2>Hämta från Stripe</h2>
 			<p>Hämtar de senaste betalningarna, utbetalningarna, kunderna och saldotransaktionerna från Stripe till den lokala databasen.</p>
+			if d.IsFirstSync {
+				<p class="text-muted">Första synken — vill du bestämma hur långt tillbaka data hämtas? <a href="/settings#sync-from-date">Ange startdatum i inställningar</a>.</p>
+			}
 			<button
 				class="btn btn-primary"
 				hx-post="/sync/stripe"
