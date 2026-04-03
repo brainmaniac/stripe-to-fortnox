@@ -69,6 +69,7 @@ type fortnoxInvoicePaymentRequest struct {
 		AmountCurrency       float64 `json:"AmountCurrency"`
 		PaymentDate          string  `json:"PaymentDate"`
 		ModeOfPaymentAccount int     `json:"ModeOfPaymentAccount"`
+		Booked               bool    `json:"Booked"`
 	} `json:"InvoicePayment"`
 }
 
@@ -214,6 +215,7 @@ func (s *InvoiceService) MarkInvoicePaid(ctx context.Context, invoiceNumber, cha
 	req.InvoicePayment.AmountCurrency = toMajorUnit(amountOre)
 	req.InvoicePayment.PaymentDate = paymentDate.Format("2006-01-02")
 	req.InvoicePayment.ModeOfPaymentAccount = clearingNum
+	req.InvoicePayment.Booked = true
 
 	if _, err := s.api.Post(ctx, "invoicepayments", req); err != nil {
 		return fmt.Errorf("post invoicepayment: %w", err)
