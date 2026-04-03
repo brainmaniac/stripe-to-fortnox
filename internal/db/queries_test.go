@@ -327,3 +327,77 @@ func TestBalanceTransactionsPerPayout(t *testing.T) {
 		t.Errorf("expected 3 txns for payout, got %d", len(txns))
 	}
 }
+
+// ── C-series: ListChargesNeedingInvoicePayment uses available_on ──────────────
+// Charges with a Fortnox invoice but no payment recorded should appear here,
+// with available_on from the balance transaction as the payment date.
+// No payout confirmation required (C is created at charge time).
+
+func TestListChargesNeedingInvoicePayment(t *testing.T) {
+	q := testutil.NewTestDB(t)
+	ctx := context.Background()
+
+	availableOn := time.Date(2026, 4, 8, 0, 0, 0, 0, time.UTC).Unix()
+
+	// Insert charge with a balance transaction.
+	_ = q.UpsertStripeCharge(ctx, db.StripeCharge{
+		ID:        "ch_c_test",
+		Amount:    5000,
+		Currency:  "usd",
+		Status:    "succeeded",
+		CreatedAt: time.Now().Unix(),
+	})
+	_ = q.UpsertStripeBalanceTransaction(ctx, db.StripeBalanceTransaction{
+		ID:          "txn_c_test",
+		Amount:      5000,
+		Fee:         200,
+		Net:         4800,
+		Currency:    "usd",
+		Type:        "charge",
+		SourceID:    sql.NullString{String: "ch_c_test", Valid: true},
+		CreatedAt:   time.Now().Unix(),
+		AvailableOn: availableOn,
+	})
+
+	// Not in the list yet — no invoice number.
+	results, err := q.ListChargesNeedingInvoicePayment(ctx)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	for _, r := range results {
+		if r.ID == "ch_c_test" {
+			t.Error("charge without invoice should not appear")
+		}
+	}
+
+	// Set invoice number — now it should appear.
+	_ = q.SetChargeFortnoxInvoiceNumber(ctx, "ch_c_test", "999")
+
+	results, err = q.ListChargesNeedingInvoicePayment(ctx)
+	if err != nil {
+		t.Fatalf("list after invoice: %v", err)
+	}
+	var found *db.ChargePaymentNeeded
+	for i := range results {
+		if results[i].ID == "ch_c_test" {
+			found = &results[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatal("charge with invoice should appear in ListChargesNeedingInvoicePayment")
+	}
+	if found.AvailableOn != availableOn {
+		t.Errorf("AvailableOn: got %d, want %d", found.AvailableOn, availableOn)
+	}
+
+	// Mark as paid — should disappear.
+	_ = q.SetChargeInvoicePaid(ctx, "ch_c_test")
+
+	results, _ = q.ListChargesNeedingInvoicePayment(ctx)
+	for _, r := range results {
+		if r.ID == "ch_c_test" {
+			t.Error("paid charge should not appear in ListChargesNeedingInvoicePayment")
+		}
+	}
+}

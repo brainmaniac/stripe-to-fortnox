@@ -28,29 +28,15 @@ const (
 	AccountRevenue25VAT     = AccountRevenueSE
 )
 
-// EU member state country codes.
-var euCountries = map[string]bool{
-	"AT": true, "BE": true, "BG": true, "CY": true, "CZ": true,
-	"DE": true, "DK": true, "EE": true, "ES": true, "FI": true,
-	"FR": true, "GR": true, "HR": true, "HU": true, "IE": true,
-	"IT": true, "LT": true, "LU": true, "LV": true, "MT": true,
-	"NL": true, "PL": true, "PT": true, "RO": true, "SI": true,
-	"SK": true,
-}
-
-// AccountConfig holds the configurable account numbers for voucher creation.
+// AccountConfig holds the configurable account numbers for fee and payout voucher creation.
 type AccountConfig struct {
 	StripeClearing   string
 	BankAccount      string
-	RevenueSE        string
-	RevenueEU        string
-	RevenueWO        string
-	OutputVAT25      string
 	PaymentFee       string
 	ReverseVATDebit  string
 	ReverseVATCredit string
 	VoucherSeries    string
-	VATPercent       float64
+	VATPercent       float64 // VAT rate for reverse-VAT fee vouchers (omvänd moms), e.g. 25.0
 }
 
 // DefaultAccountConfig returns the configured defaults.
@@ -58,27 +44,12 @@ func DefaultAccountConfig() AccountConfig {
 	return AccountConfig{
 		StripeClearing:   AccountStripeClearing,
 		BankAccount:      AccountBankAccount,
-		RevenueSE:        AccountRevenueSE,
-		RevenueEU:        AccountRevenueEU,
-		RevenueWO:        AccountRevenueWO,
-		OutputVAT25:      AccountOutputVAT25,
 		PaymentFee:       AccountPaymentFee,
 		ReverseVATDebit:  AccountReverseVATDebit,
 		ReverseVATCredit: AccountReverseVATCredit,
 		VoucherSeries:    "A",
 		VATPercent:       25.0,
 	}
-}
-
-// revenueAccount returns the correct intäktskonto for a billing country code.
-func (cfg AccountConfig) revenueAccount(countryCode string) string {
-	if countryCode == "" || countryCode == "SE" {
-		return cfg.RevenueSE
-	}
-	if euCountries[countryCode] {
-		return cfg.RevenueEU
-	}
-	return cfg.RevenueWO
 }
 
 // VoucherRow represents a single accounting row in a Fortnox voucher.
@@ -126,49 +97,6 @@ func NewVoucherCreator(api *APIClient, queries *db.Queries, config AccountConfig
 // toMajorUnit converts a minor currency unit (cents, öre, pence) to the major unit (dollar, krona, pound).
 func toMajorUnit(minor int64) float64 {
 	return float64(minor) / 100.0
-}
-
-// CreateChargeVoucher creates a Fortnox voucher for a succeeded Stripe charge.
-// countryCode is the billing country (e.g. "SE", "DE", "US"). Empty defaults to SE.
-func (vc *VoucherCreator) CreateChargeVoucher(ctx context.Context, charge db.StripeCharge, countryCode string) (*db.FortnoxVoucher, error) {
-	existing, err := vc.queries.GetFortnoxVoucherBySource(ctx, "charge", charge.ID)
-	if err != nil {
-		return nil, err
-	}
-	// Only skip if the voucher is confirmed in Fortnox (has a voucher number).
-	// A pending row (NULL voucher number) means a previous attempt started but
-	// didn't finish — we should retry the Fortnox call.
-	if existing != nil && existing.FortnoxVoucherNumber.Valid {
-		return existing, nil
-	}
-
-	amount := toMajorUnit(charge.Amount)
-	revenueAcc := vc.config.revenueAccount(countryCode)
-
-	var rows []VoucherRow
-	rows = append(rows, VoucherRow{Account: vc.config.StripeClearing, Debit: amount})
-
-	if countryCode == "" || countryCode == "SE" {
-		// Swedish domestic sale — split revenue and output VAT.
-		vatRate := vc.config.VATPercent / 100.0
-		vatAmount := amount * vatRate / (1 + vatRate)
-		revenue := amount - vatAmount
-		rows = append(rows,
-			VoucherRow{Account: revenueAcc, Credit: revenue},
-			VoucherRow{Account: vc.config.OutputVAT25, Credit: vatAmount},
-		)
-	} else {
-		// EU / export — full amount to revenue, no Swedish VAT.
-		rows = append(rows, VoucherRow{Account: revenueAcc, Credit: amount})
-	}
-
-	req := VoucherRequest{}
-	req.Voucher.Description = fmt.Sprintf("Stripe charge %s", charge.ID)
-	req.Voucher.VoucherSeries = vc.config.VoucherSeries
-	req.Voucher.TransactionDate = time.Unix(charge.CreatedAt, 0).Format("2006-01-02")
-	req.Voucher.VoucherRows = rows
-
-	return vc.postVoucher(ctx, req, "charge", charge.ID)
 }
 
 // CreatePayoutVoucher creates a Fortnox voucher for a Stripe payout.

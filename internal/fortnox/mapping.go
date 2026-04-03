@@ -30,6 +30,16 @@ func NewMappingResolver(queries *db.Queries) *MappingResolver {
 	return &MappingResolver{queries: queries}
 }
 
+// euCountries is the set of EU member state country codes.
+var euCountries = map[string]bool{
+	"AT": true, "BE": true, "BG": true, "CY": true, "CZ": true,
+	"DE": true, "DK": true, "EE": true, "ES": true, "FI": true,
+	"FR": true, "GR": true, "HR": true, "HU": true, "IE": true,
+	"IT": true, "LT": true, "LU": true, "LV": true, "MT": true,
+	"NL": true, "PL": true, "PT": true, "RO": true, "SI": true,
+	"SK": true,
+}
+
 // countryGroup returns the matchkod ("SE", "EU", or "WO") for a billing country code.
 func countryGroup(countryCode string) string {
 	if countryCode == "" || countryCode == "SE" {
