@@ -131,8 +131,7 @@ func (s *Scheduler) syncAll(ctx context.Context) {
 			chargeID := txn.SourceID.String
 
 			if txn.Fee > 0 {
-				txnDate := time.Unix(txn.CreatedAt, 0)
-				if _, err := s.voucherCreator.CreateFeeVoucher(ctx, chargeID, txn.Fee, txnDate); err != nil {
+				if _, err := s.voucherCreator.CreateFeeVoucher(ctx, chargeID, txn.Fee, payout); err != nil {
 					log.Printf("scheduler: create fee voucher for charge %s: %v", chargeID, err)
 				}
 			}

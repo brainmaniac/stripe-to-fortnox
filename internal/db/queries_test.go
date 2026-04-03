@@ -232,7 +232,7 @@ func TestListUnsyncedPayoutsPendingAndConfirmed(t *testing.T) {
 
 	// Pending voucher for po_x.
 	_ = q.InsertPendingFortnoxVoucher(ctx, db.FortnoxVoucher{
-		FortnoxVoucherSeries: "A",
+		FortnoxVoucherSeries: "S",
 		VoucherDate:          "2025-01-01",
 		SourceType:           "payout",
 		SourceID:             "po_x",
@@ -262,7 +262,7 @@ func TestInsertPendingVoucherIdempotent(t *testing.T) {
 	ctx := context.Background()
 
 	pending := db.FortnoxVoucher{
-		FortnoxVoucherSeries: "A",
+		FortnoxVoucherSeries: "S",
 		VoucherDate:          "2025-01-01",
 		SourceType:           "charge",
 		SourceID:             "ch_pending",

@@ -27,7 +27,7 @@ func (m *mockPoster) Post(_ context.Context, _ string, _ interface{}) ([]byte, e
 	}
 	resp := VoucherResponse{}
 	resp.Voucher.VoucherNumber = m.voucherNumber
-	resp.Voucher.VoucherSeries = "A"
+	resp.Voucher.VoucherSeries = "S"
 	b, _ := json.Marshal(resp)
 	return b, nil
 }
@@ -76,9 +76,16 @@ func TestFeeVoucherReverseVAT(t *testing.T) {
 	ctx := context.Background()
 
 	feeOre := int64(2500) // 25 USD fee
-	date := time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC)
+	payout := db.StripePayout{
+		ID:          "po_fee_test",
+		Amount:      50000,
+		Currency:    "sek",
+		ArrivalDate: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC).Unix(),
+		Status:      "paid",
+		CreatedAt:   time.Now().Unix(),
+	}
 
-	v, err := vc.CreateFeeVoucher(ctx, "ch_fee_test", feeOre, date)
+	v, err := vc.CreateFeeVoucher(ctx, "ch_fee_test", feeOre, payout)
 	if err != nil {
 		t.Fatalf("CreateFeeVoucher: %v", err)
 	}
@@ -224,7 +231,7 @@ func TestPostVoucherRejectsImbalanced(t *testing.T) {
 
 	req := VoucherRequest{}
 	req.Voucher.Description = "test"
-	req.Voucher.VoucherSeries = "A"
+	req.Voucher.VoucherSeries = "S"
 	req.Voucher.TransactionDate = "2025-01-01"
 	req.Voucher.VoucherRows = []VoucherRow{
 		{Account: "1521", Debit: 100},

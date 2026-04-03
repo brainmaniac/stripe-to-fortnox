@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"stripe-fortnox-sync/internal/db"
@@ -47,7 +48,7 @@ func DefaultAccountConfig() AccountConfig {
 		PaymentFee:       AccountPaymentFee,
 		ReverseVATDebit:  AccountReverseVATDebit,
 		ReverseVATCredit: AccountReverseVATCredit,
-		VoucherSeries:    "A",
+		VoucherSeries:    "S",
 		VATPercent:       25.0,
 	}
 }
@@ -111,9 +112,10 @@ func (vc *VoucherCreator) CreatePayoutVoucher(ctx context.Context, payout db.Str
 
 	amount := toMajorUnit(payout.Amount)
 	req := VoucherRequest{}
-	req.Voucher.Description = fmt.Sprintf("Stripe utbetalning %s", payout.ID)
+	date := time.Unix(payout.ArrivalDate, 0).Format("2006-01-02")
+	req.Voucher.Description = fmt.Sprintf("Stripe Utbetalning - %s - %s - ID %s", date, strings.ToUpper(payout.Currency), payout.ID)
 	req.Voucher.VoucherSeries = vc.config.VoucherSeries
-	req.Voucher.TransactionDate = time.Unix(payout.ArrivalDate, 0).Format("2006-01-02")
+	req.Voucher.TransactionDate = date
 	req.Voucher.VoucherRows = []VoucherRow{
 		{Account: vc.config.BankAccount, Debit: amount},
 		{Account: vc.config.StripeClearing, Credit: amount},
@@ -124,7 +126,8 @@ func (vc *VoucherCreator) CreatePayoutVoucher(ctx context.Context, payout db.Str
 
 // CreateFeeVoucher creates a Fortnox voucher for a Stripe processing fee with reverse VAT.
 // Stripe Ltd (Ireland) is an EU service provider → omvänd skattskyldighet applies.
-func (vc *VoucherCreator) CreateFeeVoucher(ctx context.Context, chargeID string, feeOre int64, date time.Time) (*db.FortnoxVoucher, error) {
+// The description matches the payout voucher so both S-series entries reference the same payout.
+func (vc *VoucherCreator) CreateFeeVoucher(ctx context.Context, chargeID string, feeOre int64, payout db.StripePayout) (*db.FortnoxVoucher, error) {
 	sourceID := "fee_" + chargeID
 	existing, err := vc.queries.GetFortnoxVoucherBySource(ctx, "fee", sourceID)
 	if err != nil {
@@ -137,10 +140,11 @@ func (vc *VoucherCreator) CreateFeeVoucher(ctx context.Context, chargeID string,
 	fee := toMajorUnit(feeOre)
 	reverseVAT := fee * (vc.config.VATPercent / 100.0)
 
+	date := time.Unix(payout.ArrivalDate, 0).Format("2006-01-02")
 	req := VoucherRequest{}
-	req.Voucher.Description = fmt.Sprintf("Stripe avgift för charge %s", chargeID)
+	req.Voucher.Description = fmt.Sprintf("Stripe Utbetalning - %s - %s - ID %s", date, strings.ToUpper(payout.Currency), payout.ID)
 	req.Voucher.VoucherSeries = vc.config.VoucherSeries
-	req.Voucher.TransactionDate = date.Format("2006-01-02")
+	req.Voucher.TransactionDate = date
 	req.Voucher.VoucherRows = []VoucherRow{
 		{Account: vc.config.PaymentFee, Debit: fee},
 		{Account: vc.config.ReverseVATDebit, Debit: reverseVAT},

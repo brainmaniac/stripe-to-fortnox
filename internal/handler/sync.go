@@ -192,8 +192,7 @@ func processPayout(
 
 		// Create fee voucher for the Stripe processing fee (omvänd moms applies).
 		if txn.Fee > 0 {
-			txnDate := time.Unix(txn.CreatedAt, 0)
-			if _, err := voucherCreator.CreateFeeVoucher(ctx, chargeID, txn.Fee, txnDate); err != nil {
+			if _, err := voucherCreator.CreateFeeVoucher(ctx, chargeID, txn.Fee, payout); err != nil {
 				log.Printf("create fee voucher for charge %s: %v", chargeID, err)
 			}
 		}
