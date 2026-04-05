@@ -142,7 +142,7 @@ func (vc *VoucherCreator) CreateFeeVoucher(ctx context.Context, chargeID string,
 
 	date := time.Unix(payout.ArrivalDate, 0).Format("2006-01-02")
 	req := VoucherRequest{}
-	req.Voucher.Description = fmt.Sprintf("Stripe Utbetalning - %s - %s - ID %s", date, strings.ToUpper(payout.Currency), payout.ID)
+	req.Voucher.Description = fmt.Sprintf("Stripe Utbetalning - %s - %s - ID %s - Stripe Billing Fee", date, strings.ToUpper(payout.Currency), payout.ID)
 	req.Voucher.VoucherSeries = vc.config.VoucherSeries
 	req.Voucher.TransactionDate = date
 	req.Voucher.VoucherRows = []VoucherRow{
