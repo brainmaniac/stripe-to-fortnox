@@ -113,7 +113,7 @@ func (vc *VoucherCreator) CreatePayoutVoucher(ctx context.Context, payout db.Str
 	amount := toMajorUnit(payout.Amount)
 	req := VoucherRequest{}
 	date := time.Unix(payout.ArrivalDate, 0).Format("2006-01-02")
-	req.Voucher.Description = fmt.Sprintf("Stripe Payout - %s - %s - ID %s", date, strings.ToUpper(payout.Currency), payout.ID)
+	req.Voucher.Description = fmt.Sprintf("Stripe Utbetalning - %s - %s - ID %s", date, strings.ToUpper(payout.Currency), payout.ID)
 	req.Voucher.VoucherSeries = vc.config.VoucherSeries
 	req.Voucher.TransactionDate = date
 	req.Voucher.VoucherRows = []VoucherRow{
@@ -142,7 +142,7 @@ func (vc *VoucherCreator) CreateFeeVoucher(ctx context.Context, chargeID string,
 
 	date := time.Unix(payout.ArrivalDate, 0).Format("2006-01-02")
 	req := VoucherRequest{}
-	req.Voucher.Description = fmt.Sprintf("Stripe Billing Fee - %s - %s - ID %s", date, strings.ToUpper(payout.Currency), payout.ID)
+	req.Voucher.Description = fmt.Sprintf("Stripe Avgift - %s - %s - ID %s", date, strings.ToUpper(payout.Currency), payout.ID)
 	req.Voucher.VoucherSeries = vc.config.VoucherSeries
 	req.Voucher.TransactionDate = date
 	req.Voucher.VoucherRows = []VoucherRow{
