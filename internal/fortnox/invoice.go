@@ -69,7 +69,12 @@ type fortnoxInvoicePaymentRequest struct {
 		AmountCurrency       float64 `json:"AmountCurrency"`
 		PaymentDate          string  `json:"PaymentDate"`
 		ModeOfPaymentAccount int     `json:"ModeOfPaymentAccount"`
-		Booked               bool    `json:"Booked"`
+	} `json:"InvoicePayment"`
+}
+
+type fortnoxInvoicePaymentResponse struct {
+	InvoicePayment struct {
+		Number int `json:"Number"`
 	} `json:"InvoicePayment"`
 }
 
@@ -215,10 +220,23 @@ func (s *InvoiceService) MarkInvoicePaid(ctx context.Context, invoiceNumber, cha
 	req.InvoicePayment.AmountCurrency = toMajorUnit(amountOre)
 	req.InvoicePayment.PaymentDate = paymentDate.Format("2006-01-02")
 	req.InvoicePayment.ModeOfPaymentAccount = clearingNum
-	req.InvoicePayment.Booked = true
 
-	if _, err := s.api.Post(ctx, "invoicepayments", req); err != nil {
+	respBody, err := s.api.Post(ctx, "invoicepayments", req)
+	if err != nil {
 		return fmt.Errorf("post invoicepayment: %w", err)
+	}
+
+	var paymentResp fortnoxInvoicePaymentResponse
+	if err := json.Unmarshal(respBody, &paymentResp); err != nil {
+		return fmt.Errorf("parse invoicepayment response: %w", err)
+	}
+	if paymentResp.InvoicePayment.Number == 0 {
+		return fmt.Errorf("fortnox returned empty payment number")
+	}
+
+	bookkeepPath := fmt.Sprintf("invoicepayments/%d/bookkeep", paymentResp.InvoicePayment.Number)
+	if _, err := s.api.Put(ctx, bookkeepPath, nil); err != nil {
+		return fmt.Errorf("bookkeep invoicepayment %d: %w", paymentResp.InvoicePayment.Number, err)
 	}
 
 	if chargeID != "" {
