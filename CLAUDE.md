@@ -89,7 +89,6 @@ The `## Walkthrough` section of `README.md` is the canonical description of what
 |---|---|
 | Stripe data pull (incremental) | `internal/stripe/sync_test.go`: `TestChargeCreatedAtPreserved` |
 | Balance transaction sync | `internal/db/queries_test.go`: `TestBalanceTransactionsPerPayout` |
-| Real-time updates via webhook | `internal/stripe/sync_test.go`: `TestChargeFromStripeRefundedStatus`, `TestChargeFromStripeFieldMapping` |
 | Revenue account routing by billing country | `internal/fortnox/voucher_test.go`: `TestCountryGroup` |
 | Charge → Fortnox invoice (B-series) + invoice payment (C-series) | `internal/db/queries_test.go`: `TestListChargesNeedingInvoicePayment` |
 | Charge invoices are idempotent | `internal/db/queries_test.go`: `TestListUnsyncedChargesPendingAndConfirmed` |

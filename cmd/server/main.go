@@ -52,7 +52,6 @@ func main() {
 
 	// Stripe
 	stripeSyncer := stripepkg.NewSyncer(cfg.StripeAPIKey, queries)
-	stripeWebhookHandler := stripepkg.NewWebhookHandler(cfg.StripeWebhookSecret, queries, stripeSyncer)
 
 	// Fortnox
 	fortnoxOAuth := fortnox.NewOAuthClient(cfg.FortnoxClientID, cfg.FortnoxClientSecret, cfg.BaseURL, queries)
@@ -71,7 +70,6 @@ func main() {
 	dashboardHandler := handler.NewDashboardHandler(queries, fortnoxOAuth)
 	syncHandler := handler.NewSyncHandler(queries, stripeSyncer, voucherCreator, invoiceService)
 	settingsHandler := handler.NewSettingsHandler(queries, fortnoxOAuth, cfg, sessionManager)
-	webhookHandler := handler.NewWebhookHandler(stripeWebhookHandler)
 
 	// Router
 	r := chi.NewRouter()
@@ -83,7 +81,6 @@ func main() {
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})
-	r.Post("/webhook/stripe", webhookHandler.Handle)
 	r.Get("/login", authHandler.LoginPage)
 	r.Post("/login", authHandler.LoginPost)
 	r.Get("/auth/fortnox/callback", settingsHandler.FortnoxCallback)

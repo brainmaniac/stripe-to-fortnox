@@ -144,24 +144,19 @@ func main() {
 	ok("Session secret generated automatically.")
 
 	// ── Stripe ────────────────────────────────────────────────────────────────
-	header("3 / 6 — Stripe")
-	note("Find these in the Stripe Dashboard → Developers → API keys / Webhooks.")
+	header("3 / 5 — Stripe")
+	note("Find this in the Stripe Dashboard → Developers → API keys.")
 	cfg["STRIPE_API_KEY"] = promptRequired("Stripe API key (sk_live_… or sk_test_…)", "")
-	cfg["STRIPE_WEBHOOK_SECRET"] = prompt(
-		"Stripe webhook secret (whsec_…)",
-		"",
-		"Leave blank for now — you can add it after setting up the webhook endpoint.",
-	)
 
 	// ── Fortnox ───────────────────────────────────────────────────────────────
-	header("4 / 6 — Fortnox")
+	header("4 / 5 — Fortnox")
 	note("Create an integration at developer.fortnox.se → My integrations.")
 	note("Set the redirect URI to: <BASE_URL>/settings/fortnox/callback")
 	cfg["FORTNOX_CLIENT_ID"] = promptRequired("Fortnox client ID", "")
 	cfg["FORTNOX_CLIENT_SECRET"] = promptRequired("Fortnox client secret", "")
 
 	// ── App URL ───────────────────────────────────────────────────────────────
-	header("5 / 6 — App URL")
+	header("5 / 5 — App URL")
 	cfg["BASE_URL"] = prompt(
 		"Base URL",
 		"http://localhost:8080",
@@ -169,7 +164,7 @@ func main() {
 	)
 
 	// ── Port & database ───────────────────────────────────────────────────────
-	header("6 / 6 — Server (optional)")
+	header("Server (optional)")
 	cfg["APP_PORT"] = prompt("HTTP port", "8080", "")
 	cfg["DB_PATH"] = prompt("Database file path", "./data/app.db", "")
 
@@ -184,10 +179,6 @@ func main() {
 	fmt.Printf("  %s1.%s Start the app:          %sgo run ./cmd/server%s\n", bold, reset, cyan, reset)
 	fmt.Printf("  %s2.%s Open the web UI:         %s%s%s\n", bold, reset, cyan, cfg["BASE_URL"], reset)
 	fmt.Printf("  %s3.%s Connect Fortnox:         Inställningar → Anslut Fortnox\n", bold, reset)
-	if cfg["STRIPE_WEBHOOK_SECRET"] == "" {
-		fmt.Printf("  %s4.%s Add webhook secret:     re-run setup or edit .env after creating the\n", bold, reset)
-		fmt.Printf("         Stripe webhook pointing to %s/webhook/stripe\n", cfg["BASE_URL"])
-	}
 	fmt.Println()
 }
 
@@ -197,7 +188,6 @@ func writeEnv(path string, cfg map[string]string) error {
 		"ADMIN_PASSWORD_HASH",
 		"SESSION_SECRET",
 		"STRIPE_API_KEY",
-		"STRIPE_WEBHOOK_SECRET",
 		"FORTNOX_CLIENT_ID",
 		"FORTNOX_CLIENT_SECRET",
 		"BASE_URL",

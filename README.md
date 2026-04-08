@@ -17,8 +17,6 @@ This section describes what the app actually does, end to end. Each bullet is co
 
 - **Balance transaction sync**: When a payout reaches "paid" status — either detected during a sync or via a real-time webhook — the app immediately fetches all balance transactions settled in that payout from Stripe. These transactions detail the individual charges that make up the payout amount and are stored locally for reference.
 
-- **Real-time updates via webhook**: Stripe sends event notifications to `/webhook/stripe`. The app processes `charge.succeeded`, `charge.updated`, `charge.refunded`, `payout.paid`, `payout.updated`, `payout.reconciliation_completed`, `customer.created`, and `customer.updated` in real time, keeping the local database current without waiting for the next manual sync.
-
 - **Revenue account routing by billing country**: Each charge carries a billing country from Stripe's BillingDetails field. The app uses this to pick the correct Fortnox revenue account — configurable in Inställningar → Kontomappning: Sweden (SE or unknown) → 3010, EU member states → 3007, rest of world → 3008. All charges are invoiced with 25% VAT.
 
 - **Charge → Fortnox invoice (B-series) + invoice payment (C-series)**: For each unsynced succeeded charge, the app creates a customer in Fortnox (if needed), posts an invoice via `POST /3/invoices` then bookkeeps it via `PUT /3/invoices/{n}/bookkeep` (Fortnox creates the B-series voucher: debit 1510, credit revenue account + VAT), then records an invoice payment via `POST /3/invoicepayments` with `Booked: true` dated at the balance transaction's `available_on` (Fortnox creates the C-series voucher: debit 1521, credit 1510). The Fortnox invoice number is stored on the charge to prevent duplicates.
@@ -47,7 +45,6 @@ This section describes what the app actually does, end to end. Each bullet is co
 ### What you need from Stripe
 
 1. **Secret API key** — Go to **Stripe Dashboard → Developers → API keys** and copy the **Secret key** (`sk_live_...` or `sk_test_...`). Do not use the publishable key.
-2. **Webhook signing secret** — Create a webhook endpoint (see [Stripe Webhook](#stripe-webhook) below), then copy the **Signing secret** (`whsec_...`) shown after creation.
 
 ### What you need from Fortnox
 
@@ -82,10 +79,6 @@ Go to **Inställningar** and click **Anslut Fortnox** to complete the OAuth2 flo
 
 1. Go to **Synkronisering** → **Hämta från Stripe** to pull charges, payouts, and customers
 2. Click **Skicka till Fortnox** to create accounting vouchers from the synced data
-
-### 5. Set up Stripe webhook (optional, for real-time updates)
-
-Point your Stripe webhook to `https://your-domain/webhook/stripe` and enable the events listed in the [Stripe Webhook](#stripe-webhook) section below.
 
 ---
 
@@ -201,11 +194,3 @@ Uses Swedish BAS-kontoplan accounts (configurable in Inställningar):
 | 2614 | Omvänd moms kredit |
 
 Account 1521 acts as the clearing account — its running balance should equal the Stripe dashboard balance.
-
-## Stripe Webhook
-
-Point your Stripe webhook to `https://your-domain/webhook/stripe` and enable these events:
-
-- `charge.succeeded`, `charge.updated`, `charge.refunded`
-- `payout.paid`, `payout.updated`, `payout.reconciliation_completed`
-- `customer.created`, `customer.updated`
