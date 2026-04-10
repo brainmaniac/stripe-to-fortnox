@@ -164,7 +164,7 @@ func (s *InvoiceService) CreateInvoice(ctx context.Context, charge db.StripeChar
 	req.Invoice.InvoiceRows = []fortnoxInvoiceRow{
 		{
 			AccountNumber:     accountNum,
-			Description:       charge.ID,
+			Description:       "Försäljning via Stripe",
 			Price:             toMajorUnit(charge.Amount),
 			VAT:               vatRate,
 			DeliveredQuantity: 1,
