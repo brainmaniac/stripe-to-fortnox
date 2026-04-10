@@ -124,16 +124,17 @@ func (s *Scheduler) syncAll(ctx context.Context) {
 			continue
 		}
 
+		var totalFee int64
 		for _, txn := range txns {
-			if txn.Type != "charge" || !txn.SourceID.Valid {
+			if txn.Type != "charge" {
 				continue
 			}
-			chargeID := txn.SourceID.String
+			totalFee += txn.Fee
+		}
 
-			if txn.Fee > 0 {
-				if _, err := s.voucherCreator.CreateFeeVoucher(ctx, chargeID, txn.Fee, payout); err != nil {
-					log.Printf("scheduler: create fee voucher for charge %s: %v", chargeID, err)
-				}
+		if totalFee > 0 {
+			if _, err := s.voucherCreator.CreateFeeVoucher(ctx, payout.ID, totalFee, payout); err != nil {
+				log.Printf("scheduler: create fee voucher for payout %s: %v", payout.ID, err)
 			}
 		}
 

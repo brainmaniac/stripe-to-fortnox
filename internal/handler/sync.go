@@ -184,17 +184,18 @@ func processPayout(
 		return err
 	}
 
+	var totalFee int64
 	for _, txn := range txns {
-		if txn.Type != "charge" || !txn.SourceID.Valid {
+		if txn.Type != "charge" {
 			continue
 		}
-		chargeID := txn.SourceID.String
+		totalFee += txn.Fee
+	}
 
-		// Create fee voucher for the Stripe processing fee (omvänd moms applies).
-		if txn.Fee > 0 {
-			if _, err := voucherCreator.CreateFeeVoucher(ctx, chargeID, txn.Fee, payout); err != nil {
-				log.Printf("create fee voucher for charge %s: %v", chargeID, err)
-			}
+	// Create one fee voucher for the total Stripe processing fees in this payout.
+	if totalFee > 0 {
+		if _, err := voucherCreator.CreateFeeVoucher(ctx, payout.ID, totalFee, payout); err != nil {
+			log.Printf("create fee voucher for payout %s: %v", payout.ID, err)
 		}
 	}
 

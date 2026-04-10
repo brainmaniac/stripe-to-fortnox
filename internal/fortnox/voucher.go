@@ -124,11 +124,11 @@ func (vc *VoucherCreator) CreatePayoutVoucher(ctx context.Context, payout db.Str
 	return vc.postVoucher(ctx, req, "payout", payout.ID)
 }
 
-// CreateFeeVoucher creates a Fortnox voucher for a Stripe processing fee with reverse VAT.
+// CreateFeeVoucher creates a single Fortnox voucher for the total Stripe processing fees in a payout.
 // Stripe Ltd (Ireland) is an EU service provider → omvänd skattskyldighet applies.
-// The description matches the payout voucher so both S-series entries reference the same payout.
-func (vc *VoucherCreator) CreateFeeVoucher(ctx context.Context, chargeID string, feeOre int64, payout db.StripePayout) (*db.FortnoxVoucher, error) {
-	sourceID := "fee_" + chargeID
+// One voucher per payout; sourceRef is the payout ID for idempotency.
+func (vc *VoucherCreator) CreateFeeVoucher(ctx context.Context, sourceRef string, feeOre int64, payout db.StripePayout) (*db.FortnoxVoucher, error) {
+	sourceID := "fee_" + sourceRef
 	existing, err := vc.queries.GetFortnoxVoucherBySource(ctx, "fee", sourceID)
 	if err != nil {
 		return nil, err

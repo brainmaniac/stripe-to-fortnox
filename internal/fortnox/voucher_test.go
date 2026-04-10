@@ -85,7 +85,7 @@ func TestFeeVoucherReverseVAT(t *testing.T) {
 		CreatedAt:   time.Now().Unix(),
 	}
 
-	v, err := vc.CreateFeeVoucher(ctx, "ch_fee_test", feeOre, payout)
+	v, err := vc.CreateFeeVoucher(ctx, payout.ID, feeOre, payout)
 	if err != nil {
 		t.Fatalf("CreateFeeVoucher: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestFeeVoucherReverseVAT(t *testing.T) {
 		t.Errorf("fee math unbalanced: debit=%.2f credit=%.2f", totalDebit, totalCredit)
 	}
 
-	stored, err := q.GetFortnoxVoucherBySource(ctx, "fee", "fee_ch_fee_test")
+	stored, err := q.GetFortnoxVoucherBySource(ctx, "fee", "fee_po_fee_test")
 	if err != nil || stored == nil {
 		t.Fatalf("fee voucher not found in db: %v", err)
 	}
