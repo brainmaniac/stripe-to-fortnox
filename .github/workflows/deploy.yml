@@ -1,52 +1,94 @@
-name: Deploy
+name: build-and-deploy
+
+# Push model: test → build the image → push to GHCR → SSH into Box B and roll
+# the container forward. Box B never sees source and never builds — it only pulls
+# the finished image. The app's secrets (secrets.env) and its SQLite data volume
+# live on the box and are never touched by a deploy; this job only rewrites .env
+# with the new immutable image tag.
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/brainmaniac/stripe-to-fortnox
 
 jobs:
   test:
-    name: Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23'
-
       - name: Run tests
         run: go test ./...
 
-  deploy:
-    name: Deploy to VPS
+  build:
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write          # to push to GHCR
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
+      - uses: actions/checkout@v4
+
+      - name: Compute immutable image tag
+        id: meta
+        run: echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            set -e
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-            DEPLOY_PATH="${{ secrets.VPS_DEPLOY_PATH }}"
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-            if [ -d "$DEPLOY_PATH/.git" ]; then
-              echo "Pulling latest changes..."
-              git -C "$DEPLOY_PATH" -c credential.helper='' pull origin main
-            else
-              echo "Cloning repository..."
-              git -c credential.helper='' clone ${{ secrets.VPS_REPO_URL }} "$DEPLOY_PATH"
-            fi
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Box B over SSH
+        env:
+          SSH_KEY: ${{ secrets.BOXB_DEPLOY_SSH_KEY }}
+          HOST: ${{ secrets.BOXB_HOST }}
+          DEPLOY_USER: ${{ secrets.BOXB_DEPLOY_USER }}
+          TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
-            cd "$DEPLOY_PATH"
-
-            if [ ! -f ".env" ]; then
-              echo "::warning::No .env file found on VPS. SSH in and run: go run ./cmd/setup"
-              exit 0
-            fi
-
-            docker compose up -d --build
+          # Write the new immutable tag into the app's .env and roll forward.
+          # secrets.env (Stripe/Fortnox/admin) and the app-data volume are NOT
+          # touched here. TAG is expanded locally by the runner before send.
+          ssh -i ~/.ssh/id_deploy "$DEPLOY_USER@$HOST" bash -s <<EOF
+          set -euo pipefail
+          cd /opt/stack/stripe-to-fortnox
+          echo "IMAGE_TAG=$TAG" > .env
+          docker compose pull
+          docker compose up -d
+          docker image prune -f
+          EOF
