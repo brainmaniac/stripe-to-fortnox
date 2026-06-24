@@ -5,7 +5,10 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # Stage 2: Generate templ files
-FROM ghcr.io/a-h/templ:latest AS templ-generate
+# Pin the templ CLI to the a-h/templ runtime version in go.mod. A floating
+# `:latest` drifts ahead of the runtime and emits generated code that calls
+# functions (e.g. templ.ResolveAttributeValue) the pinned runtime lacks → build fails.
+FROM ghcr.io/a-h/templ:v0.3.1001 AS templ-generate
 COPY --chown=65532:65532 . /app
 WORKDIR /app
 RUN ["templ", "generate"]
